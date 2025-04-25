@@ -1,6 +1,11 @@
-"""Google News API client implementations."""
+"""Google News API client implementations.
 
-# Standard library imports
+Provides synchronous and asynchronous clients for
+Google News RSS feed API with rate limiting, caching,
+and automatic retries. See GoogleNewsClient and
+AsyncGoogleNewsClient for usage.
+"""
+
 import logging
 import platform
 import random
@@ -8,12 +13,10 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
-# Third-party imports
 import feedparser
 import httpx
 from feedparser import FeedParserDict
 
-# Local imports
 from .exceptions import (
     ConfigurationError,
     HTTPError,
@@ -34,15 +37,15 @@ logger = logging.getLogger(__name__)
 
 
 def _generate_chrome_version():
-    """Generate a recent Chrome version number."""
-    major = 122  # Latest stable Chrome version
+    """Generate a plausible Chrome version number."""
+    major = 122
     build = random.randint(0, 5000)
     patch = random.randint(0, 300)
     return f"{major}.0.{build}.{patch}"
 
 
 def _get_platform_info():
-    """Get platform specific browser info."""
+    """Get platform-specific browser info string."""
     system = platform.system()
     if system == "Windows":
         return "Windows NT 10.0; Win64; x64"
@@ -52,7 +55,6 @@ def _get_platform_info():
         return "X11; Linux x86_64"
 
 
-# Chrome browser headers with detailed browser fingerprint
 CHROME_HEADERS = {
     "User-Agent": (
         f"Mozilla/5.0 ({_get_platform_info()}) AppleWebKit/537.36 "
@@ -90,15 +92,22 @@ class BaseGoogleNewsClient(ABC):
         requests_per_minute: int = 60,
         cache_ttl: int = 300,
     ) -> None:
-        """Initialize the Google News client."""
+        """
+        Initialize the Google News API client.
+
+        Args:
+            language (str): Language code (e.g., "en", "fr", "de") or
+                            language-country format (e.g., "en-US", "fr-FR")
+            country (str): Country code (e.g., "US", "FR", "DE")
+            requests_per_minute (int): Number of requests per minute
+            cache_ttl (int): Cache time-to-live in seconds
+        """
         self._validate_language(language)
         self._validate_country(country)
 
-        # Store full language code for hl parameter
         self.language_full = (
             language.upper() if "-" in language else f"{language.upper()}-{country}"
         )
-        # Store base language for ceid parameter
         self.language_base = language.split("-")[0].lower()
         self.country = country.upper()
         self._setup_rate_limiter_and_cache(requests_per_minute, cache_ttl)
@@ -107,46 +116,21 @@ class BaseGoogleNewsClient(ABC):
     def _setup_rate_limiter_and_cache(
         self, requests_per_minute: int, cache_ttl: int
     ) -> None:
-        """Set up rate limiter and cache implementations."""
         pass
 
     @staticmethod
     def _validate_language(language: str) -> None:
-        """Validate the language code.
-
-        Args:
-            language: Language code (either 'en' or 'en-US' format)
-
-        Raises:
-            ConfigurationError: If language code is invalid
-        """
-        if not isinstance(language, str):
-            raise ConfigurationError(
-                "Language must be a string",
-                field="language",
-                value=language,
-            )
-
-        # Allow both "en" and "en-US" format
         parts = language.split("-")
         if len(parts) > 2 or len(parts[0]) != 2:
             raise ConfigurationError(
-                "Language must be either a two-letter "
-                "ISO 639-1 code or language-COUNTRY format",
+                "Language must be a two-letter ISO 639-1 "
+                "code or language-COUNTRY format",
                 field="language",
                 value=language,
             )
 
     @staticmethod
     def _validate_country(country: str) -> None:
-        """Validate the country code.
-
-        Args:
-            country: Two-letter country code
-
-        Raises:
-            ConfigurationError: If country code is invalid
-        """
         if not isinstance(country, str) or len(country) != 2:
             raise ConfigurationError(
                 "Country must be a two-letter ISO 3166-1 alpha-2 code",
@@ -155,14 +139,6 @@ class BaseGoogleNewsClient(ABC):
             )
 
     def _validate_query(self, query: str) -> None:
-        """Validate the search query.
-
-        Args:
-            query: Search query string
-
-        Raises:
-            ValidationError: If query is empty or invalid
-        """
         if not query or not isinstance(query, str):
             raise ValidationError(
                 "Query must be a non-empty string",
@@ -171,24 +147,17 @@ class BaseGoogleNewsClient(ABC):
             )
 
     def _build_url(self, path: str) -> str:
-        """Build a URL with language and country parameters."""
-        # For search queries, use the search endpoint
         if path.startswith("search"):
             query = path.split("q=")[1] if "q=" in path else ""
             base = f"{self.BASE_URL}rss/search"
             params = {
-                "q": query.replace(
-                    "+", " "
-                ),  # Replace + with space for proper encoding
+                "q": query.replace("+", " "),
                 "hl": self.language_full,
                 "gl": self.country,
                 "ceid": f"{self.country}:{self.language_base}",
             }
-            return (
-                f"{base}?{urlencode(params)}"  # Remove quote() to avoid double encoding
-            )
+            return f"{base}?{urlencode(params)}"
 
-        # For top news
         elif not path:
             base = f"{self.BASE_URL}rss/headlines/section/topic/WORLD"
             params = {
@@ -196,9 +165,8 @@ class BaseGoogleNewsClient(ABC):
                 "gl": self.country,
                 "ceid": f"{self.country}:{self.language_base}",
             }
-            return f"{base}?{urlencode(params)}"  # Remove quote()
+            return f"{base}?{urlencode(params)}"
 
-        # For specific topics
         elif path.startswith("topic/"):
             base = f"{self.BASE_URL}rss/headlines/section/{path}"
             params = {
@@ -206,29 +174,19 @@ class BaseGoogleNewsClient(ABC):
                 "gl": self.country,
                 "ceid": f"{self.country}:{self.language_base}",
             }
-            return f"{base}?{urlencode(params)}"  # Remove quote()
+            return f"{base}?{urlencode(params)}"
 
-        # For other paths
         base = f"{self.BASE_URL}rss/{path}"
         params = {
             "hl": self.language_full,
             "gl": self.country,
             "ceid": f"{self.country}:{self.language_base}",
         }
-        return f"{base}?{urlencode(params)}"  # Remove quote()
+        return f"{base}?{urlencode(params)}"
 
     def _parse_articles(
         self, feed: FeedParserDict, max_results: Optional[int] = None
     ) -> List[Dict[str, Any]]:
-        """Parse articles from a feed.
-
-        Args:
-            feed: Parsed feed dictionary
-            max_results: Maximum number of results to return
-
-        Returns:
-            List of article dictionaries
-        """
         articles = feed.entries[:max_results] if max_results else feed.entries
         return [
             {
@@ -242,8 +200,6 @@ class BaseGoogleNewsClient(ABC):
         ]
 
     def _get_topic_path(self, topic: str) -> str:
-        """Get the path for a specific topic."""
-        # Map common topics to their Google News paths
         topic_map = {
             "WORLD": "WORLD",
             "NATION": "NATION",
@@ -267,12 +223,11 @@ class BaseGoogleNewsClient(ABC):
 
 
 class GoogleNewsClient(BaseGoogleNewsClient):
-    """Synchronous client for the Google News RSS feed API."""
+    """Synchronous client for Google News RSS feed API."""
 
     def _setup_rate_limiter_and_cache(
         self, requests_per_minute: int, cache_ttl: int
     ) -> None:
-        """Set up synchronous rate limiter and cache."""
         self.rate_limiter = RateLimiter(requests_per_minute)
         self.cache = Cache(ttl=cache_ttl)
         self.client = httpx.Client(
@@ -280,24 +235,11 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         )
 
     def __del__(self) -> None:
-        """Close the HTTP client."""
+        """Close the client."""
         self.client.close()
 
     @retry_sync(exceptions=(HTTPError, RateLimitError), max_retries=3, backoff=2.0)
     def _fetch_feed(self, url: str) -> FeedParserDict:
-        """Fetch and parse an RSS feed synchronously.
-
-        Args:
-            url: Feed URL to fetch
-
-        Returns:
-            Parsed feed dictionary
-
-        Raises:
-            HTTPError: If the HTTP request fails
-            RateLimitError: If rate limit is exceeded
-            ParsingError: If feed parsing fails
-        """
         cached = self.cache.get(url)
         if cached is not None:
             return cached
@@ -342,21 +284,7 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         *,
         max_results: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        """Search for news articles synchronously.
-
-        Args:
-            query: Search query string
-            max_results: Maximum number of results to return
-
-        Returns:
-            List of article dictionaries
-
-        Raises:
-            ValidationError: If query is empty or invalid
-            HTTPError: If the HTTP request fails
-            RateLimitError: If rate limit is exceeded
-            ParsingError: If response parsing fails
-        """
+        """Search for news articles."""
         self._validate_query(query)
         url = self._build_url(f"search?q={query}")
         feed = self._fetch_feed(url)
@@ -368,7 +296,7 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         *,
         max_results: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        """Get top news articles synchronously for a specific topic."""
+        """Get top news articles for a topic."""
         path = self._get_topic_path(topic)
         url = self._build_url(path)
         feed = self._fetch_feed(url)
@@ -376,12 +304,11 @@ class GoogleNewsClient(BaseGoogleNewsClient):
 
 
 class AsyncGoogleNewsClient(BaseGoogleNewsClient):
-    """Asynchronous client for the Google News RSS feed API."""
+    """Asynchronous client for Google News RSS feed API."""
 
     def _setup_rate_limiter_and_cache(
         self, requests_per_minute: int, cache_ttl: int
     ) -> None:
-        """Set up asynchronous rate limiter and cache."""
         self.rate_limiter = AsyncRateLimiter(requests_per_minute)
         self.cache = AsyncCache(ttl=cache_ttl)
         self.client = httpx.AsyncClient(
@@ -389,32 +316,19 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         )
 
     async def __aenter__(self) -> "AsyncGoogleNewsClient":
-        """Enter async context."""
+        """Enter the context manager."""
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Exit async context and close the client."""
+        """Exit the context manager."""
         await self.client.aclose()
 
     async def aclose(self) -> None:
-        """Close the HTTP client."""
+        """Close the client."""
         await self.client.aclose()
 
     @retry_async(exceptions=(HTTPError, RateLimitError), max_retries=3, backoff=2.0)
     async def _fetch_feed(self, url: str) -> FeedParserDict:
-        """Fetch and parse an RSS feed asynchronously.
-
-        Args:
-            url: Feed URL to fetch
-
-        Returns:
-            Parsed feed dictionary
-
-        Raises:
-            HTTPError: If the HTTP request fails
-            RateLimitError: If rate limit is exceeded
-            ParsingError: If feed parsing fails
-        """
         cached = await self.cache.get(url)
         if cached is not None:
             return cached
@@ -459,21 +373,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         *,
         max_results: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        """Search for news articles asynchronously.
-
-        Args:
-            query: Search query string
-            max_results: Maximum number of results to return
-
-        Returns:
-            List of article dictionaries
-
-        Raises:
-            ValidationError: If query is empty or invalid
-            HTTPError: If the HTTP request fails
-            RateLimitError: If rate limit is exceeded
-            ParsingError: If response parsing fails
-        """
+        """Search for news articles asynchronously."""
         self._validate_query(query)
         url = self._build_url(f"search?q={query}")
         feed = await self._fetch_feed(url)
@@ -485,7 +385,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         *,
         max_results: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        """Get top news articles asynchronously for a specific topic."""
+        """Get top news articles for a topic asynchronously."""
         path = self._get_topic_path(topic)
         url = self._build_url(path)
         feed = await self._fetch_feed(url)
