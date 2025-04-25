@@ -1,7 +1,7 @@
 """Google News API package."""
 
 from .client import AsyncGoogleNewsClient, GoogleNewsClient
-from .config import Config
+from .config import ClientConfig
 from .exceptions import (
     ConfigurationError,
     GoogleNewsError,
@@ -20,7 +20,7 @@ __email__ = "mazzapaolo2019@gmail.com"
 __all__ = [
     "AsyncGoogleNewsClient",
     "GoogleNewsClient",
-    "Config",
+    "ClientConfig",
     "ConfigurationError",
     "GoogleNewsError",
     "HTTPError",

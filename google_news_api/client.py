@@ -4,18 +4,14 @@
 import logging
 import platform
 import random
-import subprocess
-import sys
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
 
 # Third-party imports
 import feedparser
 import httpx
 from feedparser import FeedParserDict
-from playwright.async_api import async_playwright
-from playwright.sync_api import sync_playwright
 
 # Local imports
 from .exceptions import (
@@ -35,144 +31,6 @@ from .utils import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _setup_playwright():
-    """Ensure Playwright and browsers are installed."""
-    try:
-        # Install Playwright browsers
-        subprocess.run(
-            [sys.executable, "-m", "playwright", "install", "chromium"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        logger.info("Playwright browser installation completed successfully")
-        return True
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to install Playwright browsers: {e.stderr}")
-        raise ConfigurationError(
-            "Failed to install Playwright browsers. "
-            "Please ensure you have proper permissions and network access."
-        )
-    except Exception as e:
-        logger.error(f"Unexpected error during Playwright setup: {e}")
-        raise ConfigurationError(
-            "Unexpected error during Playwright setup. "
-            "Please check your Python environment."
-        )
-
-
-def _extract_cookies_sync():
-    """Extract cookies from Google News using Playwright synchronously."""
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent=CHROME_HEADERS["User-Agent"],
-            viewport={"width": 1920, "height": 1080},
-            device_scale_factor=1,
-            is_mobile=False,
-            has_touch=False,
-        )
-
-        page = context.new_page()
-
-        # Set extra headers
-        page.set_extra_http_headers(
-            {
-                k: v
-                for k, v in CHROME_HEADERS.items()
-                if k not in ["User-Agent"]  # User-Agent is set in context
-            }
-        )
-
-        try:
-            # Navigate to Google News
-            page.goto("https://news.google.com/")
-
-            # Wait for the page to load and any consent dialogs
-            page.wait_for_load_state("networkidle")
-
-            # Look for and handle any consent buttons
-            consent_buttons = [
-                'button:has-text("Accept all")',
-                'button:has-text("I agree")',
-                'button:has-text("Agree")',
-                'button:has-text("Accept")',
-            ]
-
-            for button in consent_buttons:
-                try:
-                    page.click(button, timeout=5000)
-                    page.wait_for_load_state("networkidle")
-                    break
-                except Exception:  # Could be TimeoutError or ElementNotFoundError
-                    continue
-
-            # Extract cookies
-            cookies = context.cookies()
-            cookie_dict = {cookie["name"]: cookie["value"] for cookie in cookies}
-
-            return cookie_dict
-
-        finally:
-            browser.close()
-
-
-async def _extract_cookies_async():
-    """Extract cookies from Google News using Playwright asynchronously."""
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context(
-            user_agent=CHROME_HEADERS["User-Agent"],
-            viewport={"width": 1920, "height": 1080},
-            device_scale_factor=1,
-            is_mobile=False,
-            has_touch=False,
-        )
-
-        page = await context.new_page()
-
-        # Set extra headers
-        await page.set_extra_http_headers(
-            {
-                k: v
-                for k, v in CHROME_HEADERS.items()
-                if k not in ["User-Agent"]  # User-Agent is set in context
-            }
-        )
-
-        try:
-            # Navigate to Google News
-            await page.goto("https://news.google.com/")
-
-            # Wait for the page to load and any consent dialogs
-            await page.wait_for_load_state("networkidle")
-
-            # Look for and handle any consent buttons
-            consent_buttons = [
-                'button:has-text("Accept all")',
-                'button:has-text("I agree")',
-                'button:has-text("Agree")',
-                'button:has-text("Accept")',
-            ]
-
-            for button in consent_buttons:
-                try:
-                    await page.click(button, timeout=5000)
-                    await page.wait_for_load_state("networkidle")
-                    break
-                except Exception:  # Could be TimeoutError or ElementNotFoundError
-                    continue
-
-            # Extract cookies
-            cookies = await context.cookies()
-            cookie_dict = {cookie["name"]: cookie["value"] for cookie in cookies}
-
-            return cookie_dict
-
-        finally:
-            await browser.close()
 
 
 def _generate_chrome_version():
@@ -233,18 +91,17 @@ class BaseGoogleNewsClient(ABC):
         cache_ttl: int = 300,
     ) -> None:
         """Initialize the Google News client."""
-        # Ensure Playwright is set up first
-        _setup_playwright()
-
         self._validate_language(language)
         self._validate_country(country)
 
-        self.language = language.lower()
+        # Store full language code for hl parameter
+        self.language_full = (
+            language.upper() if "-" in language else f"{language.upper()}-{country}"
+        )
+        # Store base language for ceid parameter
+        self.language_base = language.split("-")[0].lower()
         self.country = country.upper()
         self._setup_rate_limiter_and_cache(requests_per_minute, cache_ttl)
-
-        # Initialize cookies
-        self.cookies = {}
 
     @abstractmethod
     def _setup_rate_limiter_and_cache(
@@ -258,14 +115,24 @@ class BaseGoogleNewsClient(ABC):
         """Validate the language code.
 
         Args:
-            language: Two-letter language code
+            language: Language code (either 'en' or 'en-US' format)
 
         Raises:
             ConfigurationError: If language code is invalid
         """
-        if not isinstance(language, str) or len(language) != 2:
+        if not isinstance(language, str):
             raise ConfigurationError(
-                "Language must be a two-letter ISO 639-1 code",
+                "Language must be a string",
+                field="language",
+                value=language,
+            )
+
+        # Allow both "en" and "en-US" format
+        parts = language.split("-")
+        if len(parts) > 2 or len(parts[0]) != 2:
+            raise ConfigurationError(
+                "Language must be either a two-letter "
+                "ISO 639-1 code or language-COUNTRY format",
                 field="language",
                 value=language,
             )
@@ -310,41 +177,45 @@ class BaseGoogleNewsClient(ABC):
             query = path.split("q=")[1] if "q=" in path else ""
             base = f"{self.BASE_URL}rss/search"
             params = {
-                "q": query,
-                "hl": self.language,
+                "q": query.replace(
+                    "+", " "
+                ),  # Replace + with space for proper encoding
+                "hl": self.language_full,
                 "gl": self.country,
-                "ceid": f"{self.country}:{self.language}",
+                "ceid": f"{self.country}:{self.language_base}",
             }
-            return f"{base}?{quote(urlencode(params))}"
+            return (
+                f"{base}?{urlencode(params)}"  # Remove quote() to avoid double encoding
+            )
 
         # For top news
         elif not path:
             base = f"{self.BASE_URL}rss/headlines/section/topic/WORLD"
             params = {
-                "hl": self.language,
+                "hl": self.language_full,
                 "gl": self.country,
-                "ceid": f"{self.country}:{self.language}",
+                "ceid": f"{self.country}:{self.language_base}",
             }
-            return f"{base}?{urlencode(params)}"
+            return f"{base}?{urlencode(params)}"  # Remove quote()
 
         # For specific topics
         elif path.startswith("topic/"):
             base = f"{self.BASE_URL}rss/headlines/section/{path}"
             params = {
-                "hl": self.language,
+                "hl": self.language_full,
                 "gl": self.country,
-                "ceid": f"{self.country}:{self.language}",
+                "ceid": f"{self.country}:{self.language_base}",
             }
-            return f"{base}?{urlencode(params)}"
+            return f"{base}?{urlencode(params)}"  # Remove quote()
 
         # For other paths
         base = f"{self.BASE_URL}rss/{path}"
         params = {
-            "hl": self.language,
+            "hl": self.language_full,
             "gl": self.country,
-            "ceid": f"{self.country}:{self.language}",
+            "ceid": f"{self.country}:{self.language_base}",
         }
-        return f"{base}?{urlencode(params)}"
+        return f"{base}?{urlencode(params)}"  # Remove quote()
 
     def _parse_articles(
         self, feed: FeedParserDict, max_results: Optional[int] = None
@@ -369,24 +240,6 @@ class BaseGoogleNewsClient(ABC):
             }
             for entry in articles
         ]
-
-    def _initialize_cookies_sync(self):
-        """Initialize cookies using Playwright synchronously."""
-        try:
-            self.cookies = _extract_cookies_sync()
-            # if self.client:
-            #     self.client.cookies.update(self.cookies)
-        except Exception as e:
-            logger.warning(f"Failed to extract cookies using Playwright: {e}")
-
-    async def _initialize_cookies_async(self):
-        """Initialize cookies using Playwright asynchronously."""
-        try:
-            self.cookies = await _extract_cookies_async()
-            # if self.client:
-            #     self.client.cookies.update(self.cookies)
-        except Exception as e:
-            logger.warning(f"Failed to extract cookies using Playwright: {e}")
 
     def _get_topic_path(self, topic: str) -> str:
         """Get the path for a specific topic."""
@@ -426,9 +279,6 @@ class GoogleNewsClient(BaseGoogleNewsClient):
             follow_redirects=True, timeout=30.0, headers=CHROME_HEADERS
         )
 
-        # Initialize cookies synchronously
-        self._initialize_cookies_sync()
-
     def __del__(self) -> None:
         """Close the HTTP client."""
         self.client.close()
@@ -455,11 +305,6 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         with self.rate_limiter:
             try:
                 response = self.client.get(url)
-
-                if "consent.google.com" in response.url.host:
-                    # If we hit the consent page, update cookies and retry
-                    self.client.cookies.update(self.cookies)
-                    response = self.client.get(url)
 
                 if response.status_code == 429:
                     retry_after = float(response.headers.get("Retry-After", 60))
@@ -544,8 +389,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         )
 
     async def __aenter__(self) -> "AsyncGoogleNewsClient":
-        """Enter async context and initialize cookies."""
-        await self._initialize_cookies_async()
+        """Enter async context."""
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -578,11 +422,6 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         async with self.rate_limiter:
             try:
                 response = await self.client.get(url)
-
-                if "consent.google.com" in response.url.host:
-                    # If we hit the consent page, update cookies and retry
-                    self.client.cookies.update(self.cookies)
-                    response = await self.client.get(url)
 
                 if response.status_code == 429:
                     retry_after = float(response.headers.get("Retry-After", 60))
