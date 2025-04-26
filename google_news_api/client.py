@@ -83,7 +83,7 @@ CHROME_HEADERS = {
 class BaseGoogleNewsClient(ABC):
     """Base class for Google News API clients."""
 
-    BASE_URL = "https://news.google.com/"
+    BASE_URL = "https://news.google.com/rss/"
 
     def __init__(
         self,
@@ -147,46 +147,52 @@ class BaseGoogleNewsClient(ABC):
             )
 
     def _build_url(self, path: str) -> str:
+        """Build the URL for the request.
+
+        Args:
+            path: The path to append to the base URL
+
+        Returns:
+            The complete URL
+        """
         if path.startswith("search"):
             query = path.split("q=")[1] if "q=" in path else ""
-            base = f"{self.BASE_URL}rss/search"
             params = {
                 "q": query.replace("+", " "),
                 "hl": self.language_full,
                 "gl": self.country,
                 "ceid": f"{self.country}:{self.language_base}",
             }
-            return f"{base}?{urlencode(params)}"
+            return f"{self.BASE_URL}search?{urlencode(params)}"
 
         elif not path:
-            base = f"{self.BASE_URL}rss/headlines/section/topic/WORLD"
             params = {
                 "hl": self.language_full,
                 "gl": self.country,
                 "ceid": f"{self.country}:{self.language_base}",
             }
-            return f"{base}?{urlencode(params)}"
+            return f"{self.BASE_URL}headlines/section/topic/WORLD?{urlencode(params)}"
 
         elif path.startswith("topic/"):
-            base = f"{self.BASE_URL}rss/headlines/section/{path}"
             params = {
                 "hl": self.language_full,
                 "gl": self.country,
                 "ceid": f"{self.country}:{self.language_base}",
             }
-            return f"{base}?{urlencode(params)}"
+            return f"{self.BASE_URL}headlines/section/{path}?{urlencode(params)}"
 
-        base = f"{self.BASE_URL}rss/{path}"
         params = {
             "hl": self.language_full,
             "gl": self.country,
             "ceid": f"{self.country}:{self.language_base}",
         }
-        return f"{base}?{urlencode(params)}"
+        return f"{self.BASE_URL}{path}?{urlencode(params)}"
 
     def _parse_articles(
         self, feed: FeedParserDict, max_results: Optional[int] = None
     ) -> List[Dict[str, Any]]:
+        if max_results == 0:
+            return []
         articles = feed.entries[:max_results] if max_results else feed.entries
         return [
             {
@@ -228,25 +234,49 @@ class GoogleNewsClient(BaseGoogleNewsClient):
     def _setup_rate_limiter_and_cache(
         self, requests_per_minute: int, cache_ttl: int
     ) -> None:
-        self.rate_limiter = RateLimiter(requests_per_minute)
-        self.cache = Cache(ttl=cache_ttl)
-        self.client = httpx.Client(
+        """Set up rate limiter and cache.
+
+        Args:
+            requests_per_minute: Maximum number of requests per minute
+            cache_ttl: Cache time-to-live in seconds
+        """
+        self._rate_limiter = RateLimiter(requests_per_minute)
+        self._cache = Cache(ttl=cache_ttl)
+        self._client = httpx.Client(
             follow_redirects=True, timeout=30.0, headers=CHROME_HEADERS
         )
 
+    def __init__(
+        self,
+        language: str = "en",
+        country: str = "US",
+        requests_per_minute: int = 60,
+        cache_ttl: int = 300,
+    ) -> None:
+        """Initialize the client.
+
+        Args:
+            language: Two-letter language code (ISO 639-1) or language-country code
+            country: Two-letter country code (ISO 3166-1 alpha-2)
+            requests_per_minute: Maximum number of requests per minute
+            cache_ttl: Cache time-to-live in seconds
+        """
+        super().__init__(language, country, requests_per_minute, cache_ttl)
+
     def __del__(self) -> None:
-        """Close the client."""
-        self.client.close()
+        """Clean up resources."""
+        if hasattr(self, "_client"):
+            self._client.close()
 
     @retry_sync(exceptions=(HTTPError, RateLimitError), max_retries=3, backoff=2.0)
     def _fetch_feed(self, url: str) -> FeedParserDict:
-        cached = self.cache.get(url)
+        cached = self._cache.get(url)
         if cached is not None:
             return cached
 
-        with self.rate_limiter:
+        with self._rate_limiter:
             try:
-                response = self.client.get(url)
+                response = self._client.get(url)
 
                 if response.status_code == 429:
                     retry_after = float(response.headers.get("Retry-After", 60))
@@ -256,7 +286,7 @@ class GoogleNewsClient(BaseGoogleNewsClient):
                         response=response,
                     )
 
-                if not response.is_success:
+                if not (200 <= response.status_code < 400):
                     raise HTTPError(
                         f"HTTP {response.status_code}: {response.reason_phrase}",
                         status_code=response.status_code,
@@ -272,7 +302,7 @@ class GoogleNewsClient(BaseGoogleNewsClient):
                         error=feed.bozo_exception,
                     )
 
-                self.cache.set(url, feed)
+                self._cache.set(url, feed)
                 return feed
 
             except httpx.RequestError as e:
@@ -345,7 +375,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
                         response=response,
                     )
 
-                if not response.is_success:
+                if not (200 <= response.status_code < 400):
                     raise HTTPError(
                         f"HTTP {response.status_code}: {response.reason_phrase}",
                         status_code=response.status_code,

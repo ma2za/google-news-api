@@ -1,6 +1,6 @@
 [project]
 name = "google-news-api"
-version = "0.0.1"
+version = "0.0.2"
 description = ""
 authors = [
     {name = "Paolo Mazza",email = "mazzapaolo2019@gmail.com"}
@@ -21,8 +21,31 @@ build-backend = "poetry.core.masonry.api"
 isort = "^6.0.1"
 black = "^25.1.0"
 flake8 = "^7.2.0"
+pytest = "^8.0.0"
+pytest-cov = "^4.1.0"
+pytest-asyncio = "^0.23.5"
 
 [tool.black]
 line-length = 88
 target-version = ['py39']
 skip-string-normalization = true  # This makes Black preserve single quotes
+
+[tool.pytest.ini_options]
+addopts = "--cov=google_news_api --cov-report=term-missing --cov-report=html"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+branch = true
+source = ["google_news_api"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError",
+]

@@ -50,8 +50,41 @@ class StructuredFormatter(logging.Formatter):
             "logger": record.name,
         }
 
+        # Add any extra attributes
         if hasattr(record, "props"):
             message.update(record.props)
+        # Handle extra attributes passed directly
+        if hasattr(record, "__dict__"):
+            extras = {
+                key: value
+                for key, value in record.__dict__.items()
+                if key
+                not in {
+                    "args",
+                    "asctime",
+                    "created",
+                    "exc_info",
+                    "exc_text",
+                    "filename",
+                    "funcName",
+                    "levelname",
+                    "levelno",
+                    "lineno",
+                    "module",
+                    "msecs",
+                    "msg",
+                    "name",
+                    "pathname",
+                    "process",
+                    "processName",
+                    "relativeCreated",
+                    "stack_info",
+                    "thread",
+                    "threadName",
+                    "props",
+                }
+            }
+            message.update(extras)
 
         return json.dumps(message)
 
