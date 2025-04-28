@@ -47,7 +47,7 @@ def sync_example():
         # Search for a specific topic
         topic = "python programming"
         print(f"\nSearching for news about '{topic}'...")
-        articles = client.search(topic, max_results=3)
+        articles = client.search(topic, max_results=3, when="1m")
         for article in articles:
             print_article(article)
 
