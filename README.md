@@ -6,6 +6,7 @@ A robust Python client library for the Google News RSS feed API that provides bo
 
 - ✨ Comprehensive news search and retrieval functionality
 - 🔄 Both synchronous and asynchronous APIs
+- 🕒 Advanced time-based search capabilities (date ranges and relative time)
 - 🚀 High performance with in-memory caching (TTL-based)
 - 🛡️ Built-in rate limiting with token bucket algorithm
 - 🔁 Automatic retries with exponential backoff
@@ -27,7 +28,7 @@ A robust Python client library for the Google News RSS feed API that provides bo
 poetry add google-news-api
 
 # Or clone and install from source
-git clone https://github.com/yourusername/google-news-api.git
+git clone https://github.com/ma2za/google-news-api.git
 cd google-news-api
 poetry install
 ```
@@ -59,10 +60,24 @@ try:
     for article in top_articles:
         print(f"Top News: {article['title']} - {article['source']}")
 
-    # Search for specific topics
-    search_articles = client.search("artificial intelligence", max_results=5)
-    for article in search_articles:
-        print(f"AI News: {article['title']} - {article['source']}")
+    # Search with date range
+    date_articles = client.search(
+        "Ukraine war",
+        after="2024-01-01",
+        before="2024-03-01",
+        max_results=5
+    )
+    for article in date_articles:
+        print(f"Recent News: {article['title']} - {article['published']}")
+
+    # Search with relative time
+    recent_articles = client.search(
+        "climate change",
+        when="24h",  # Last 24 hours
+        max_results=5
+    )
+    for article in recent_articles:
+        print(f"Latest News: {article['title']} - {article['published']}")
 
 except Exception as e:
     print(f"An error occurred: {e}")
@@ -152,7 +167,7 @@ except Exception as e:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/google-news-api.git
+git clone https://github.com/ma2za/google-news-api.git
 cd google-news-api
 
 # Install development dependencies
@@ -196,3 +211,43 @@ For issues, feature requests, or questions:
 - Open an issue on GitHub
 - Contact the author via email
 - Check the [examples](examples/) directory for more usage scenarios
+
+## Time-Based Search
+
+The library supports two types of time-based search:
+
+### Date Range Search
+
+Use `after` and `before` parameters to search within a specific date range:
+
+```python
+articles = client.search(
+    "Ukraine war",
+    after="2024-01-01",  # Start date (YYYY-MM-DD)
+    before="2024-03-01", # End date (YYYY-MM-DD)
+    max_results=5
+)
+```
+
+### Relative Time Search
+
+Use the `when` parameter for relative time searches:
+
+```python
+# Last hour
+articles = client.search("climate change", when="1h")
+
+# Last 24 hours
+articles = client.search("climate change", when="24h")
+
+# Last 7 days
+articles = client.search("climate change", when="7d")
+```
+
+Notes:
+- Date range parameters (`after`/`before`) must be in YYYY-MM-DD format
+- Relative time (`when`) supports:
+  - Hours (h): 1-101 hours (e.g., "1h", "24h", "101h")
+  - Days (d): Any number of days (e.g., "1d", "7d", "30d")
+- `when` parameter cannot be used together with `after` or `before`
+- All searches return articles sorted by relevance and recency

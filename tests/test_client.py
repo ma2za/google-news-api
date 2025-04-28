@@ -3,7 +3,9 @@
 import json
 import os
 import tempfile
+from datetime import datetime, timedelta, timezone
 
+import dateutil.parser
 import pytest
 
 from google_news_api.client import AsyncGoogleNewsClient, GoogleNewsClient
@@ -78,13 +80,16 @@ async def test_get_top_news():
         news = await client.top_news(max_results=5)
         assert isinstance(news, list)
         assert len(news) <= 5
-        if news:
-            assert all(isinstance(article, dict) for article in news)
-            assert all("title" in article for article in news)
-            assert all("link" in article for article in news)
-            assert all("source" in article for article in news)
-            assert all("published" in article for article in news)
-            assert all("summary" in article for article in news)
+        assert (
+            len(news) > 0
+        ), "Expected to find top news articles but none were returned"
+
+        assert all(isinstance(article, dict) for article in news)
+        assert all("title" in article for article in news)
+        assert all("link" in article for article in news)
+        assert all("source" in article for article in news)
+        assert all("published" in article for article in news)
+        assert all("summary" in article for article in news)
 
 
 @pytest.mark.asyncio
@@ -94,13 +99,16 @@ async def test_get_topic_news():
         news = await client.top_news("TECHNOLOGY", max_results=5)
         assert isinstance(news, list)
         assert len(news) <= 5
-        if news:
-            assert all(isinstance(article, dict) for article in news)
-            assert all("title" in article for article in news)
-            assert all("link" in article for article in news)
-            assert all("source" in article for article in news)
-            assert all("published" in article for article in news)
-            assert all("summary" in article for article in news)
+        assert (
+            len(news) > 0
+        ), "Expected to find technology news articles but none were returned"
+
+        assert all(isinstance(article, dict) for article in news)
+        assert all("title" in article for article in news)
+        assert all("link" in article for article in news)
+        assert all("source" in article for article in news)
+        assert all("published" in article for article in news)
+        assert all("summary" in article for article in news)
 
 
 @pytest.mark.asyncio
@@ -110,13 +118,14 @@ async def test_search():
         news = await client.search("python programming", max_results=5)
         assert isinstance(news, list)
         assert len(news) <= 5
-        if news:
-            assert all(isinstance(article, dict) for article in news)
-            assert all("title" in article for article in news)
-            assert all("link" in article for article in news)
-            assert all("source" in article for article in news)
-            assert all("published" in article for article in news)
-            assert all("summary" in article for article in news)
+        assert len(news) > 0, "Expected to find articles but none were returned"
+
+        assert all(isinstance(article, dict) for article in news)
+        assert all("title" in article for article in news)
+        assert all("link" in article for article in news)
+        assert all("source" in article for article in news)
+        assert all("published" in article for article in news)
+        assert all("summary" in article for article in news)
 
 
 @pytest.mark.asyncio
@@ -126,11 +135,220 @@ async def test_search_with_dates():
         news = await client.search("python programming", max_results=5)
         assert isinstance(news, list)
         assert len(news) <= 5
-        if news:
-            # Verify each article has a published date
-            for article in news:
-                assert "published" in article
-                # Could add date parsing validation here if needed
+        assert len(news) > 0, "Expected to find articles but none were returned"
+
+        # Verify each article has a published date
+        for article in news:
+            assert "published" in article
+            # Could add date parsing validation here if needed
+
+
+def test_search_with_date_range():
+    """Test searching with date range parameters."""
+    client = GoogleNewsClient()
+
+    # Test with valid date range
+    start_date = "2024-01-01"
+    end_date = "2024-03-01"
+    news = client.search(
+        "Ukraine war", after=start_date, before=end_date, max_results=5
+    )
+    assert isinstance(news, list)
+    assert len(news) <= 5
+
+
+def test_search_with_date_range_content():
+    """Test that articles from date range search fall within the specified range."""
+    client = GoogleNewsClient()
+
+    start_date = "2024-01-01"
+    end_date = "2024-03-01"
+    news = client.search(
+        "Ukraine war", after=start_date, before=end_date, max_results=5
+    )
+
+    # We expect to find at least one article
+    assert len(news) > 0, (
+        f"Expected to find articles between {start_date} and {end_date} "
+        "but none were returned"
+    )
+
+    # Verify articles fall within the date range
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    # Add one day to end_dt to make it inclusive
+    end_dt = end_dt + timedelta(days=1)
+
+    for article in news:
+        pub_date = dateutil.parser.parse(article["published"])
+        # Convert to UTC if timezone is present, otherwise assume UTC
+        if pub_date.tzinfo is None:
+            pub_date = pub_date.replace(tzinfo=timezone.utc)
+        assert start_dt <= pub_date <= end_dt, (
+            f"Article date {pub_date} outside range " f"{start_dt} to {end_dt}"
+        )
+
+
+def test_search_with_date_range_validation():
+    """Test date range parameter validation."""
+    client = GoogleNewsClient()
+
+    # Test invalid date format
+    with pytest.raises(ValidationError) as exc_info:
+        client.search("AI technology", after="2024/01/01")
+    assert "must be in YYYY-MM-DD format" in str(exc_info.value)
+
+    with pytest.raises(ValidationError) as exc_info:
+        client.search("AI technology", before="24-1-1")
+    assert "must be in YYYY-MM-DD format" in str(exc_info.value)
+
+
+def test_search_with_relative_time():
+    """Test searching with relative time parameters."""
+    client = GoogleNewsClient()
+
+    # Test valid relative time formats
+    for when, _ in [
+        ("1h", timedelta(hours=1)),
+        ("24h", timedelta(hours=24)),
+        ("7d", timedelta(days=7)),
+    ]:
+        news = client.search("climate change", when=when, max_results=5)
+        assert isinstance(news, list)
+        assert len(news) <= 5
+
+
+def test_search_with_relative_time_content():
+    """Test that articles from relative time search fall within the specified range."""
+    client = GoogleNewsClient()
+
+    # Test valid relative time formats
+    for when, delta in [
+        ("1h", timedelta(hours=1)),
+        ("24h", timedelta(hours=24)),
+        ("7d", timedelta(days=7)),
+    ]:
+        news = client.search("climate change", when=when, max_results=5)
+
+        # We expect to find at least one article for each time range
+        assert len(news) > 0, (
+            f"Expected to find articles within last {when} " "but none were returned"
+        )
+
+        # Verify articles are within the time range
+        now = datetime.now(timezone.utc)
+        earliest = now - delta
+        for article in news:
+            pub_date = dateutil.parser.parse(article["published"])
+            # Convert to UTC if timezone is present, otherwise assume UTC
+            if pub_date.tzinfo is None:
+                pub_date = pub_date.replace(tzinfo=timezone.utc)
+            assert earliest <= pub_date <= now, (
+                f"Article date {pub_date} outside range "
+                f"{earliest} to {now} for when={when}"
+            )
+
+
+def test_search_with_relative_time_validation():
+    """Test relative time parameter validation."""
+    client = GoogleNewsClient()
+
+    # Test invalid relative time format
+    with pytest.raises(ValidationError) as exc_info:
+        client.search("AI technology", when="1x")
+    assert "must be in format: <number>[h|d]" in str(exc_info.value)
+
+    # Test hour limit
+    with pytest.raises(ValidationError) as exc_info:
+        client.search("AI technology", when="102h")
+    assert "Hour range must be <= 101" in str(exc_info.value)
+
+    # Test invalid unit
+    with pytest.raises(ValidationError) as exc_info:
+        client.search("AI technology", when="1m")
+    assert "must be in format: <number>[h|d]" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_async_search_with_time_parameters():
+    """Test time-based search parameters with async client."""
+    async with AsyncGoogleNewsClient() as client:
+        # Test date range
+        start_date = "2024-01-01"
+        end_date = "2024-03-01"
+        news = await client.search(
+            "Ukraine war", after=start_date, before=end_date, max_results=5
+        )
+        assert isinstance(news, list)
+        assert len(news) <= 5
+
+
+@pytest.mark.asyncio
+async def test_async_search_with_time_parameters_content():
+    """Test content of time-based search results with async client."""
+    async with AsyncGoogleNewsClient() as client:
+        # Test date range
+        start_date = "2024-01-01"
+        end_date = "2024-03-01"
+        news = await client.search(
+            "Ukraine war", after=start_date, before=end_date, max_results=5
+        )
+
+        # We expect to find at least one article
+        assert len(news) > 0, (
+            f"Expected to find articles between {start_date} and {end_date} "
+            "but none were returned"
+        )
+
+        # Verify articles fall within the date range
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(
+            tzinfo=timezone.utc
+        )
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        # Add one day to end_dt to make it inclusive
+        end_dt = end_dt + timedelta(days=1)
+
+        for article in news:
+            pub_date = dateutil.parser.parse(article["published"])
+            # Convert to UTC if timezone is present, otherwise assume UTC
+            if pub_date.tzinfo is None:
+                pub_date = pub_date.replace(tzinfo=timezone.utc)
+            assert start_dt <= pub_date <= end_dt, (
+                f"Article date {pub_date} outside range " f"{start_dt} to {end_dt}"
+            )
+
+        # Test relative time
+        when = "24h"
+        delta = timedelta(hours=24)
+        news = await client.search("climate change", when=when, max_results=5)
+
+        # We expect to find at least one article
+        assert len(news) > 0, (
+            f"Expected to find articles within last {when} " "but none were returned"
+        )
+
+        # Verify articles are within the time range
+        now = datetime.now(timezone.utc)
+        earliest = now - delta
+        for article in news:
+            pub_date = dateutil.parser.parse(article["published"])
+            # Convert to UTC if timezone is present, otherwise assume UTC
+            if pub_date.tzinfo is None:
+                pub_date = pub_date.replace(tzinfo=timezone.utc)
+            assert earliest <= pub_date <= now, (
+                f"Article date {pub_date} outside range "
+                f"{earliest} to {now} for when={when}"
+            )
+
+
+@pytest.mark.asyncio
+async def test_async_search_with_time_parameters_validation():
+    """Test validation of time-based search parameters with async client."""
+    async with AsyncGoogleNewsClient() as client:
+        # Test validation
+        with pytest.raises(ValidationError) as exc_info:
+            await client.search("AI technology", when="1h", after="2024-01-01")
+        assert "Cannot use 'when' parameter together with" in str(exc_info.value)
 
 
 def test_sync_client_search():
@@ -139,13 +357,14 @@ def test_sync_client_search():
     news = client.search("python programming", max_results=5)
     assert isinstance(news, list)
     assert len(news) <= 5
-    if news:
-        assert all(isinstance(article, dict) for article in news)
-        assert all("title" in article for article in news)
-        assert all("link" in article for article in news)
-        assert all("source" in article for article in news)
-        assert all("published" in article for article in news)
-        assert all("summary" in article for article in news)
+    assert len(news) > 0, "Expected to find articles but none were returned"
+
+    assert all(isinstance(article, dict) for article in news)
+    assert all("title" in article for article in news)
+    assert all("link" in article for article in news)
+    assert all("source" in article for article in news)
+    assert all("published" in article for article in news)
+    assert all("summary" in article for article in news)
 
 
 def test_sync_client_top_news():
@@ -154,13 +373,14 @@ def test_sync_client_top_news():
     news = client.top_news(max_results=5)
     assert isinstance(news, list)
     assert len(news) <= 5
-    if news:
-        assert all(isinstance(article, dict) for article in news)
-        assert all("title" in article for article in news)
-        assert all("link" in article for article in news)
-        assert all("source" in article for article in news)
-        assert all("published" in article for article in news)
-        assert all("summary" in article for article in news)
+    assert len(news) > 0, "Expected to find top news articles but none were returned"
+
+    assert all(isinstance(article, dict) for article in news)
+    assert all("title" in article for article in news)
+    assert all("link" in article for article in news)
+    assert all("source" in article for article in news)
+    assert all("published" in article for article in news)
+    assert all("summary" in article for article in news)
 
 
 def test_client_cleanup():

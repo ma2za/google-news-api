@@ -146,6 +146,59 @@ class BaseGoogleNewsClient(ABC):
                 value=query,
             )
 
+    @staticmethod
+    def _validate_date(date: str, param_name: str) -> None:
+        """Validate date string format (YYYY-MM-DD).
+
+        Args:
+            date: Date string to validate
+            param_name: Parameter name for error messages
+
+        Raises:
+            ValidationError: If date format is invalid
+        """
+        import re
+
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+            raise ValidationError(
+                f"{param_name} must be in YYYY-MM-DD format",
+                field=param_name,
+                value=date,
+            )
+
+    @staticmethod
+    def _validate_when(when: str) -> None:
+        """Validate relative time range format.
+
+        Args:
+            when: Time range string (e.g., "1h", "7d")
+                 Supports hours (h) up to 101h and days (d)
+
+        Raises:
+            ValidationError: If time range format is invalid
+        """
+        import re
+
+        if not re.match(r"^\d+[hd]$", when):
+            raise ValidationError(
+                "Time range must be in format: <number>[h|d] "
+                "(e.g., '12h' for 12 hours, '7d' for 7 days)",
+                field="when",
+                value=when,
+            )
+
+        # Extract number and unit
+        number = int(when[:-1])
+        unit = when[-1]
+
+        # Validate limits
+        if unit == "h" and number > 101:
+            raise ValidationError(
+                "Hour range must be <= 101",
+                field="when",
+                value=when,
+            )
+
     def _build_url(self, path: str) -> str:
         """Build the URL for the request.
 
@@ -156,9 +209,12 @@ class BaseGoogleNewsClient(ABC):
             The complete URL
         """
         if path.startswith("search"):
-            query = path.split("q=")[1] if "q=" in path else ""
+            # Extract query parameters
+            query_parts = path.split("q=")[1].split("&")[0] if "q=" in path else ""
+
+            # Build base parameters
             params = {
-                "q": query.replace("+", " "),
+                "q": query_parts.replace("+", " "),
                 "hl": self.language_full,
                 "gl": self.country,
                 "ceid": f"{self.country}:{self.language_base}",
@@ -312,11 +368,53 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         self,
         query: str,
         *,
+        after: Optional[str] = None,
+        before: Optional[str] = None,
+        when: Optional[str] = None,
         max_results: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        """Search for news articles."""
+        """Search for news articles.
+
+        Args:
+            query: Search query string
+            after: Start date in YYYY-MM-DD format
+            before: End date in YYYY-MM-DD format
+            when: Relative time range (e.g., "1h", "7d")
+            max_results: Maximum number of results to return
+
+        Returns:
+            List of article dictionaries
+
+        Note:
+            - The after/before parameters allow date-based filtering (max 100 results)
+            - The when parameter allows relative time filtering
+            (e.g. "12h" for last 12 hours)
+            - after/before and when parameters are mutually exclusive
+        """
         self._validate_query(query)
-        url = self._build_url(f"search?q={query}")
+
+        # Build query with time parameters
+        query_parts = [query]
+
+        if when is not None:
+            if after is not None or before is not None:
+                raise ValidationError(
+                    "Cannot use 'when' parameter together with 'after' or 'before'",
+                    field="when",
+                    value=when,
+                )
+            self._validate_when(when)
+            query_parts.append(f"when:{when}")
+        else:
+            if after is not None:
+                self._validate_date(after, "after")
+                query_parts.append(f"after:{after}")
+            if before is not None:
+                self._validate_date(before, "before")
+                query_parts.append(f"before:{before}")
+
+        final_query = " ".join(query_parts)
+        url = self._build_url(f"search?q={final_query}")
         feed = self._fetch_feed(url)
         return self._parse_articles(feed, max_results)
 
@@ -401,11 +499,53 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         self,
         query: str,
         *,
+        after: Optional[str] = None,
+        before: Optional[str] = None,
+        when: Optional[str] = None,
         max_results: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        """Search for news articles asynchronously."""
+        """Search for news articles asynchronously.
+
+        Args:
+            query: Search query string
+            after: Start date in YYYY-MM-DD format
+            before: End date in YYYY-MM-DD format
+            when: Relative time range (e.g., "1h", "7d")
+            max_results: Maximum number of results to return
+
+        Returns:
+            List of article dictionaries
+
+        Note:
+            - The after/before parameters allow date-based filtering (max 100 results)
+            - The when parameter allows relative time filtering
+            (e.g. "12h" for last 12 hours)
+            - after/before and when parameters are mutually exclusive
+        """
         self._validate_query(query)
-        url = self._build_url(f"search?q={query}")
+
+        # Build query with time parameters
+        query_parts = [query]
+
+        if when is not None:
+            if after is not None or before is not None:
+                raise ValidationError(
+                    "Cannot use 'when' parameter together with 'after' or 'before'",
+                    field="when",
+                    value=when,
+                )
+            self._validate_when(when)
+            query_parts.append(f"when:{when}")
+        else:
+            if after is not None:
+                self._validate_date(after, "after")
+                query_parts.append(f"after:{after}")
+            if before is not None:
+                self._validate_date(before, "before")
+                query_parts.append(f"before:{before}")
+
+        final_query = " ".join(query_parts)
+        url = self._build_url(f"search?q={final_query}")
         feed = await self._fetch_feed(url)
         return self._parse_articles(feed, max_results)
 
