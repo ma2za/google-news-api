@@ -1,6 +1,6 @@
 [project]
 name = "google-news-api"
-version = "0.0.3"
+version = "0.0.4"
 description = ""
 authors = [
     {name = "Paolo Mazza",email = "mazzapaolo2019@gmail.com"}
@@ -50,3 +50,4 @@ exclude_lines = [
     "pass",
     "raise ImportError",
 ]
+

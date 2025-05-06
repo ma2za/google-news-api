@@ -819,3 +819,204 @@ def test_parse_articles():
     assert articles[0]["published"] == "2024-01-01"
     assert articles[0]["summary"] == ""
     assert articles[0]["source"] is None
+
+
+def test_batch_search():
+    """Test synchronous batch search functionality."""
+    client = GoogleNewsClient()
+    queries = ["python programming", "artificial intelligence"]
+
+    # Test basic functionality
+    results = client.batch_search(queries, max_results=5)
+    assert isinstance(results, dict)
+    assert set(results.keys()) == set(queries)
+
+    for query, articles in results.items():
+        assert isinstance(articles, list)
+        assert len(articles) <= 5
+        assert len(articles) > 0, f"Expected to find articles for query '{query}'"
+
+        # Verify article structure
+        for article in articles:
+            assert isinstance(article, dict)
+            assert all(
+                key in article
+                for key in ["title", "link", "published", "source", "summary"]
+            )
+
+
+def test_batch_search_with_time_params():
+    """Test synchronous batch search with time parameters."""
+    client = GoogleNewsClient()
+    queries = ["python programming", "artificial intelligence"]
+
+    # Test with relative time
+    results = client.batch_search(queries, when="24h", max_results=5)
+    now = datetime.now(timezone.utc)
+    earliest = now - timedelta(hours=24)
+
+    for articles in results.values():
+        for article in articles:
+            pub_date = dateutil.parser.parse(article["published"])
+            if pub_date.tzinfo is None:
+                pub_date = pub_date.replace(tzinfo=timezone.utc)
+            assert earliest <= pub_date <= now
+
+    # Test with date range
+    start_date = "2024-01-01"
+    end_date = "2024-03-01"
+    results = client.batch_search(
+        queries, after=start_date, before=end_date, max_results=5
+    )
+
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(
+        tzinfo=timezone.utc
+    ) + timedelta(days=1)
+
+    for articles in results.values():
+        for article in articles:
+            pub_date = dateutil.parser.parse(article["published"])
+            if pub_date.tzinfo is None:
+                pub_date = pub_date.replace(tzinfo=timezone.utc)
+            assert start_dt <= pub_date <= end_dt
+
+
+def test_batch_search_validation():
+    """Test batch search input validation."""
+    client = GoogleNewsClient()
+
+    # Test empty queries list
+    assert client.batch_search([]) == {}
+
+    # Test invalid queries parameter type
+    with pytest.raises(ValidationError) as exc_info:
+        client.batch_search("not a list")
+    assert "queries must be a list" in str(exc_info.value)
+
+    # Test invalid date format
+    with pytest.raises(ValidationError) as exc_info:
+        client.batch_search(["query"], after="2024/01/01")
+    assert "must be in YYYY-MM-DD format" in str(exc_info.value)
+
+    # Test invalid when parameter
+    with pytest.raises(ValidationError) as exc_info:
+        client.batch_search(["query"], when="invalid")
+    assert "Time range must be in format" in str(exc_info.value)
+
+    # Test mixing when with date parameters
+    with pytest.raises(ValidationError) as exc_info:
+        client.batch_search(["query"], when="24h", after="2024-01-01")
+    assert "Cannot use 'when' parameter together with" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_async_batch_search():
+    """Test asynchronous batch search functionality."""
+    async with AsyncGoogleNewsClient() as client:
+        queries = ["python programming", "artificial intelligence"]
+
+        # Test basic functionality
+        results = await client.batch_search(queries, max_results=5)
+        assert isinstance(results, dict)
+        assert set(results.keys()) == set(queries)
+
+        for query, articles in results.items():
+            assert isinstance(articles, list)
+            assert len(articles) <= 5
+            assert len(articles) > 0, f"Expected to find articles for query '{query}'"
+
+            # Verify article structure
+            for article in articles:
+                assert isinstance(article, dict)
+                assert all(
+                    key in article
+                    for key in ["title", "link", "published", "source", "summary"]
+                )
+
+
+@pytest.mark.asyncio
+async def test_async_batch_search_with_time_params():
+    """Test asynchronous batch search with time parameters."""
+    async with AsyncGoogleNewsClient() as client:
+        queries = ["python programming", "artificial intelligence"]
+
+        # Test with relative time
+        results = await client.batch_search(queries, when="24h", max_results=5)
+        now = datetime.now(timezone.utc)
+        earliest = now - timedelta(hours=24)
+
+        for articles in results.values():
+            for article in articles:
+                pub_date = dateutil.parser.parse(article["published"])
+                if pub_date.tzinfo is None:
+                    pub_date = pub_date.replace(tzinfo=timezone.utc)
+                assert earliest <= pub_date <= now
+
+        # Test with date range
+        start_date = "2024-01-01"
+        end_date = "2024-03-01"
+        results = await client.batch_search(
+            queries, after=start_date, before=end_date, max_results=5
+        )
+
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(
+            tzinfo=timezone.utc
+        )
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(
+            tzinfo=timezone.utc
+        ) + timedelta(days=1)
+
+        for articles in results.values():
+            for article in articles:
+                pub_date = dateutil.parser.parse(article["published"])
+                if pub_date.tzinfo is None:
+                    pub_date = pub_date.replace(tzinfo=timezone.utc)
+                assert start_dt <= pub_date <= end_dt
+
+
+@pytest.mark.asyncio
+async def test_async_batch_search_validation():
+    """Test asynchronous batch search input validation."""
+    async with AsyncGoogleNewsClient() as client:
+        # Test empty queries list
+        assert await client.batch_search([]) == {}
+
+        # Test invalid queries parameter type
+        with pytest.raises(ValidationError) as exc_info:
+            await client.batch_search("not a list")
+        assert "queries must be a list" in str(exc_info.value)
+
+        # Test invalid date format
+        with pytest.raises(ValidationError) as exc_info:
+            await client.batch_search(["query"], after="2024/01/01")
+        assert "must be in YYYY-MM-DD format" in str(exc_info.value)
+
+        # Test invalid when parameter
+        with pytest.raises(ValidationError) as exc_info:
+            await client.batch_search(["query"], when="invalid")
+        assert "Time range must be in format" in str(exc_info.value)
+
+        # Test mixing when with date parameters
+        with pytest.raises(ValidationError) as exc_info:
+            await client.batch_search(["query"], when="24h", after="2024-01-01")
+        assert "Cannot use 'when' parameter together with" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_async_batch_search_error_handling():
+    """Test error handling in asynchronous batch search."""
+    async with AsyncGoogleNewsClient() as client:
+        # Test with a mix of valid and invalid queries
+        queries = ["valid query", "", "another valid query"]
+        results = await client.batch_search(queries, max_results=5)
+
+        # Should still get results for valid queries
+        assert "valid query" in results
+        assert len(results["valid query"]) > 0
+        assert "another valid query" in results
+        assert len(results["another valid query"]) > 0
+
+        # Invalid query should return empty list
+        assert "" in results
+        assert results[""] == []
