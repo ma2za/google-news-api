@@ -10,7 +10,7 @@ import logging
 import platform
 import random
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlencode
 
 import feedparser
@@ -418,6 +418,74 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         feed = self._fetch_feed(url)
         return self._parse_articles(feed, max_results)
 
+    def batch_search(
+        self,
+        queries: List[str],
+        *,
+        after: Optional[str] = None,
+        before: Optional[str] = None,
+        when: Optional[str] = None,
+        max_results: Optional[int] = None,
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """Perform multiple searches in batch.
+
+        Args:
+            queries: List of search query strings
+            after: Start date in YYYY-MM-DD format
+            before: End date in YYYY-MM-DD format
+            when: Relative time range (e.g., "1h", "7d")
+            max_results: Maximum number of results to return per query
+
+        Returns:
+            Dictionary mapping each query to its list of article results
+
+        Note:
+            - The after/before parameters allow date-based filtering (max 100 results)
+            - The when parameter allows relative time filtering
+            (e.g. "12h" for last 12 hours)
+            - after/before and when parameters are mutually exclusive
+        """
+        if not queries:
+            return {}
+
+        if not isinstance(queries, list):
+            raise ValidationError(
+                "queries must be a list of strings",
+                field="queries",
+                value=queries,
+            )
+
+        # Validate time parameters once before running searches
+        if when is not None:
+            if after is not None or before is not None:
+                raise ValidationError(
+                    "Cannot use 'when' parameter together with 'after' or 'before'",
+                    field="when",
+                    value=when,
+                )
+            self._validate_when(when)
+        else:
+            if after is not None:
+                self._validate_date(after, "after")
+            if before is not None:
+                self._validate_date(before, "before")
+
+        results = {}
+        for query in queries:
+            try:
+                results[query] = self.search(
+                    query,
+                    after=after,
+                    before=before,
+                    when=when,
+                    max_results=max_results,
+                )
+            except ValidationError as e:
+                logger.error(f"Error searching for query '{query}': {str(e)}")
+                results[query] = []
+
+        return results
+
     def top_news(
         self,
         topic: str = "WORLD",
@@ -548,6 +616,84 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         url = self._build_url(f"search?q={final_query}")
         feed = await self._fetch_feed(url)
         return self._parse_articles(feed, max_results)
+
+    async def batch_search(
+        self,
+        queries: List[str],
+        *,
+        after: Optional[str] = None,
+        before: Optional[str] = None,
+        when: Optional[str] = None,
+        max_results: Optional[int] = None,
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """Perform multiple searches in batch asynchronously.
+
+        Args:
+            queries: List of search query strings
+            after: Start date in YYYY-MM-DD format
+            before: End date in YYYY-MM-DD format
+            when: Relative time range (e.g., "1h", "7d")
+            max_results: Maximum number of results to return per query
+
+        Returns:
+            Dictionary mapping each query to its list of article results
+
+        Note:
+            - The after/before parameters allow date-based filtering (max 100 results)
+            - The when parameter allows relative time filtering
+            (e.g. "12h" for last 12 hours)
+            - after/before and when parameters are mutually exclusive
+            - Searches are performed concurrently for better performance
+        """
+        if not queries:
+            return {}
+
+        if not isinstance(queries, list):
+            raise ValidationError(
+                "queries must be a list of strings",
+                field="queries",
+                value=queries,
+            )
+
+        # Validate time parameters once before running searches
+        if when is not None:
+            if after is not None or before is not None:
+                raise ValidationError(
+                    "Cannot use 'when' parameter together with 'after' or 'before'",
+                    field="when",
+                    value=when,
+                )
+            self._validate_when(when)
+        else:
+            if after is not None:
+                self._validate_date(after, "after")
+            if before is not None:
+                self._validate_date(before, "before")
+
+        async def _search_with_error_handling(
+            query: str,
+        ) -> Tuple[str, List[Dict[str, Any]]]:
+            try:
+                results = await self.search(
+                    query,
+                    after=after,
+                    before=before,
+                    when=when,
+                    max_results=max_results,
+                )
+                return query, results
+            except ValidationError as e:
+                logger.error(f"Error searching for query '{query}': {str(e)}")
+                return query, []
+
+        # Run searches concurrently
+        import asyncio
+
+        tasks = [_search_with_error_handling(query) for query in queries]
+        results_list = await asyncio.gather(*tasks)
+
+        # Convert results list to dictionary
+        return dict(results_list)
 
     async def top_news(
         self,
