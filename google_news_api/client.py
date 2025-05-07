@@ -6,16 +6,20 @@ and automatic retries. See GoogleNewsClient and
 AsyncGoogleNewsClient for usage.
 """
 
+import asyncio
+import json
 import logging
 import platform
 import random
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode, urlparse
 
 import feedparser
 import httpx
 from feedparser import FeedParserDict
+from selectolax.parser import HTMLParser
+from tqdm import tqdm
 
 from .exceptions import (
     ConfigurationError,
@@ -625,6 +629,9 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         before: Optional[str] = None,
         when: Optional[str] = None,
         max_results: Optional[int] = None,
+        max_concurrent: int = 5,
+        timeout: float = 30.0,
+        delay: float = 1.0,
     ) -> Dict[str, List[Dict[str, Any]]]:
         """Perform multiple searches in batch asynchronously.
 
@@ -634,6 +641,9 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
             before: End date in YYYY-MM-DD format
             when: Relative time range (e.g., "1h", "7d")
             max_results: Maximum number of results to return per query
+            max_concurrent: Maximum number of concurrent requests
+            timeout: Timeout in seconds for each request
+            delay: Delay in seconds between requests to avoid rate limiting
 
         Returns:
             Dictionary mapping each query to its list of article results
@@ -644,6 +654,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
             (e.g. "12h" for last 12 hours)
             - after/before and when parameters are mutually exclusive
             - Searches are performed concurrently for better performance
+            - Shows a progress bar during searching
         """
         if not queries:
             return {}
@@ -670,30 +681,38 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
             if before is not None:
                 self._validate_date(before, "before")
 
-        async def _search_with_error_handling(
+        pbar = tqdm(total=len(queries), desc="Searching news articles")
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def _search_with_progress(
             query: str,
         ) -> Tuple[str, List[Dict[str, Any]]]:
             try:
-                results = await self.search(
-                    query,
-                    after=after,
-                    before=before,
-                    when=when,
-                    max_results=max_results,
-                )
-                return query, results
+                async with semaphore:
+                    await asyncio.sleep(delay)
+                    results = await self.search(
+                        query,
+                        after=after,
+                        before=before,
+                        when=when,
+                        max_results=max_results,
+                    )
+                    pbar.update(1)
+                    return query, results
             except ValidationError as e:
                 logger.error(f"Error searching for query '{query}': {str(e)}")
+                pbar.update(1)
                 return query, []
 
-        # Run searches concurrently
-        import asyncio
+        try:
+            # Run searches concurrently
+            tasks = [_search_with_progress(query) for query in queries]
+            results_list = await asyncio.gather(*tasks)
 
-        tasks = [_search_with_error_handling(query) for query in queries]
-        results_list = await asyncio.gather(*tasks)
-
-        # Convert results list to dictionary
-        return dict(results_list)
+            # Convert results list to dictionary
+            return dict(results_list)
+        finally:
+            pbar.close()
 
     async def top_news(
         self,
@@ -706,3 +725,204 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         url = self._build_url(path)
         feed = await self._fetch_feed(url)
         return self._parse_articles(feed, max_results)
+
+    async def decode_url(self, source_url: str, timeout: float = 30.0) -> str:
+        """Decode a Google News article URL into its original source URL.
+
+        Args:
+            source_url: The Google News article URL to decode
+            timeout: Timeout in seconds for the request
+
+        Returns:
+            The decoded source URL
+
+        Raises:
+            ValidationError: If the URL is invalid
+            HTTPError: If the request fails
+            ParsingError: If the response cannot be parsed
+
+        Note:
+            This implementation is based on the work of SSujitX/google-news-url-decoder
+            (https://github.com/SSujitX/google-news-url-decoder)
+        """
+        try:
+            url = urlparse(source_url)
+            if not url.netloc.endswith("news.google.com"):
+                raise ValidationError(
+                    "URL must be a Google News article URL",
+                    field="source_url",
+                    value=source_url,
+                )
+
+            path = url.path.split("/")
+            # Check for required path segments: /rss/articles/{base64_id}
+            if len(path) < 4 or path[1] != "rss" or path[2] != "articles":
+                raise ValidationError(
+                    "Invalid Google News URL format",
+                    field="source_url",
+                    value=source_url,
+                )
+
+            base64_str = path[-1]
+            url = f"{self.BASE_URL}articles/{base64_str}"
+
+            async with self.rate_limiter:
+                response = await self.client.get(
+                    url,
+                    params={
+                        "hl": self.language_full,
+                        "gl": self.country,
+                        "ceid": f"{self.country}:{self.language_base}",
+                    },
+                    headers={
+                        "User-Agent": "python-requests/2.32.3",
+                        "Accept-Encoding": "gzip, deflate",
+                        "Accept": "*/*",
+                        "Connection": "keep-alive",
+                    },
+                    timeout=timeout,
+                )
+
+                if response.status_code == 429:
+                    retry_after = float(response.headers.get("Retry-After", 60))
+                    raise RateLimitError(
+                        "Rate limit exceeded",
+                        retry_after=retry_after,
+                        response=response,
+                    )
+
+                if not (200 <= response.status_code < 400):
+                    raise HTTPError(
+                        f"HTTP {response.status_code}: {response.reason_phrase}",
+                        status_code=response.status_code,
+                        response_text=response.text,
+                    )
+
+                parser = HTMLParser(response.text)
+                data_element = parser.css_first("c-wiz > div[jscontroller]")
+                if not data_element:
+                    raise ParsingError(
+                        "Could not find required data element in response",
+                        data=response.text,
+                    )
+
+                signature = data_element.attributes.get("data-n-a-sg")
+                timestamp = data_element.attributes.get("data-n-a-ts")
+                if not signature or not timestamp:
+                    raise ParsingError(
+                        "Missing required attributes in response",
+                        data=response.text,
+                    )
+
+                url = "https://news.google.com/_/DotsSplashUi/data/batchexecute"
+                payload = [
+                    "Fbv4je",
+                    (
+                        "["
+                        '"garturlreq",'
+                        "["
+                        '["X","X",["X","X"],null,null,1,1,'
+                        f'"{self.country}:{self.language_base}",'
+                        "null,1,null,null,null,null,null,0,1],"
+                        '"X","X",1,[1,1,1],1,1,null,0,0,null,0],'
+                        f'"{base64_str}",{timestamp},"{signature}"'
+                        "]"
+                    ),
+                ]
+
+                response = await self.client.post(
+                    url,
+                    headers={
+                        "Content-Type": (
+                            "application/x-www-form-urlencoded;charset=UTF-8"
+                        ),
+                    },
+                    content=f"f.req={quote(json.dumps([[payload]]))}",
+                    timeout=timeout,
+                )
+
+                if not (200 <= response.status_code < 400):
+                    raise HTTPError(
+                        f"HTTP {response.status_code}: {response.reason_phrase}",
+                        status_code=response.status_code,
+                        response_text=response.text,
+                    )
+
+                try:
+                    parsed_data = json.loads(response.text.split("\n\n")[1])[:-2]
+                    decoded_url = json.loads(parsed_data[0][2])[1]
+                    return decoded_url
+                except (json.JSONDecodeError, IndexError, KeyError) as e:
+                    raise ParsingError(
+                        "Failed to parse decoded URL from response",
+                        data=response.text,
+                        error=e,
+                    )
+
+        except Exception as e:
+            if isinstance(
+                e, (ValidationError, HTTPError, ParsingError, RateLimitError)
+            ):
+                raise
+            logger.error(f"Error decoding Google News URL {source_url}: {e}")
+            return source_url
+
+    async def decode_urls(
+        self,
+        urls: List[str],
+        *,
+        max_concurrent: int = 5,
+        timeout: float = 30.0,
+        delay: float = 1.0,
+    ) -> List[str]:
+        """Decode multiple Google News URLs in parallel.
+
+        Args:
+            urls: List of Google News URLs to decode
+            max_concurrent: Maximum number of concurrent requests
+            timeout: Timeout in seconds for each request
+            delay: Delay in seconds between requests to avoid rate limiting
+
+        Returns:
+            List of decoded URLs in the same order as input.
+            Invalid URLs will return None.
+
+        Note:
+            - Invalid URLs will return None
+            - Uses rate limiting to avoid overwhelming the server
+            - Shows a progress bar during decoding
+        """
+        if not urls:
+            return []
+
+        if not isinstance(urls, list):
+            raise ValidationError(
+                "urls must be a list of strings",
+                field="urls",
+                value=urls,
+            )
+
+        pbar = tqdm(total=len(urls), desc="Decoding Google News URLs")
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def decode_with_progress(url: str) -> Optional[str]:
+            try:
+                async with semaphore:
+                    await asyncio.sleep(delay)
+                    result = await self.decode_url(url, timeout)
+                    pbar.update(1)
+                    return result
+            except (ValidationError, HTTPError, ParsingError, RateLimitError) as e:
+                logger.warning(f"Failed to decode URL {url}: {str(e)}")
+                pbar.update(1)
+                return None
+            except Exception as e:
+                logger.error(f"Unexpected error decoding URL {url}: {e}")
+                pbar.update(1)
+                return None
+
+        try:
+            results = await asyncio.gather(*[decode_with_progress(url) for url in urls])
+            return results
+        finally:
+            pbar.close()

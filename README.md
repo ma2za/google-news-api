@@ -1,17 +1,38 @@
 # Google News API Client
 
+[![PyPI Downloads](https://static.pepy.tech/badge/google-news-api)](https://pepy.tech/projects/google-news-api)
+[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
+[![PyPI Version](https://img.shields.io/pypi/v/google-news-api)](https://pypi.org/project/google-news-api/)
+
 A robust Python client library for the Google News RSS feed API that provides both synchronous and asynchronous implementations with built-in rate limiting, caching, and error handling.
 
 ## Features
 
 - ✨ Comprehensive news search and retrieval functionality
+  - Search by keywords with advanced filtering
+  - Get top news by topic (WORLD, NATION, BUSINESS, TECHNOLOGY, etc.)
+  - Batch search support for multiple queries
+  - URL decoding for original article sources
 - 🔄 Both synchronous and asynchronous APIs
-- 🕒 Advanced time-based search capabilities (date ranges and relative time)
-- 🚀 High performance with in-memory caching (TTL-based)
-- 🛡️ Built-in rate limiting with token bucket algorithm
-- 🔁 Automatic retries with exponential backoff
+  - `GoogleNewsClient` for synchronous operations
+  - `AsyncGoogleNewsClient` for async/await support
+- 🕒 Advanced time-based search capabilities
+  - Date range filtering (after/before)
+  - Relative time filtering (e.g., "1h", "24h", "7d")
+  - Maximum 100 results for date-based searches
+- 🚀 High performance features
+  - In-memory caching with configurable TTL
+  - Built-in rate limiting with token bucket algorithm
+  - Automatic retries with exponential backoff
+  - Concurrent batch searches in async mode
 - 🌍 Multi-language and country support
-- 🛠️ Robust error handling and validation
+  - ISO 639-1 language codes (e.g., "en", "fr", "de")
+  - ISO 3166-1 country codes (e.g., "US", "GB", "DE")
+  - Language-country combinations (e.g., "en-US", "fr-FR")
+- 🛡️ Robust error handling
+  - Specific exceptions for different error scenarios
+  - Detailed error messages with context
+  - Graceful fallbacks and retries
 - 📦 Modern Python packaging with Poetry
 
 ## Requirements
@@ -55,11 +76,10 @@ client = GoogleNewsClient(
 )
 
 try:
-    # Get top news
-    top_articles = client.top_news(max_results=3)
-    for article in top_articles:
-        print(f"Top News: {article['title']} - {article['source']}")
-
+    # Get top news by topic
+    world_news = client.top_news(topic="WORLD", max_results=5)
+    tech_news = client.top_news(topic="TECHNOLOGY", max_results=3)
+    
     # Search with date range
     date_articles = client.search(
         "Ukraine war",
@@ -67,17 +87,28 @@ try:
         before="2024-03-01",
         max_results=5
     )
-    for article in date_articles:
-        print(f"Recent News: {article['title']} - {article['published']}")
-
+    
     # Search with relative time
     recent_articles = client.search(
         "climate change",
         when="24h",  # Last 24 hours
         max_results=5
     )
-    for article in recent_articles:
-        print(f"Latest News: {article['title']} - {article['published']}")
+    
+    # Batch search multiple queries
+    batch_results = client.batch_search(
+        queries=["AI", "machine learning", "deep learning"],
+        when="7d",  # Last 7 days
+        max_results=3
+    )
+    
+    # Process results
+    for topic, articles in batch_results.items():
+        print(f"\nTop {topic} news:")
+        for article in articles:
+            print(f"- {article['title']} ({article['source']})")
+            print(f"  Published: {article['published']}")
+            print(f"  Summary: {article['summary'][:100]}...")
 
 except Exception as e:
     print(f"An error occurred: {e}")
@@ -99,11 +130,23 @@ async def main():
         requests_per_minute=60
     ) as client:
         # Fetch multiple news categories concurrently
-        tech_news = await client.search("technology", max_results=3)
-        science_news = await client.search("science", max_results=3)
+        world_news = await client.top_news(topic="WORLD", max_results=3)
+        tech_news = await client.top_news(topic="TECHNOLOGY", max_results=3)
         
-        print(f"Found {len(tech_news)} technology articles")
-        print(f"Found {len(science_news)} science articles")
+        # Batch search with concurrent execution
+        batch_results = await client.batch_search(
+            queries=["AI", "machine learning", "deep learning"],
+            when="7d",
+            max_results=3
+        )
+        
+        # Decode Google News URLs to original sources
+        for topic, articles in batch_results.items():
+            print(f"\nTop {topic} news:")
+            for article in articles:
+                original_url = await client.decode_url(article['link'])
+                print(f"- {article['title']} ({article['source']})")
+                print(f"  Original URL: {original_url}")
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -111,12 +154,52 @@ if __name__ == "__main__":
 
 ## Configuration
 
+The library provides extensive configuration options through the client initialization:
+
 | Parameter | Description | Default | Example Values |
 |-----------|-------------|---------|----------------|
-| `language` | Two-letter language code (ISO 639-1) | `"en"` | `"es"`, `"fr"`, `"de"` |
-| `country` | Two-letter country code (ISO 3166-1) | `"US"` | `"GB"`, `"DE"`, `"JP"` |
-| `requests_per_minute` | Rate limit threshold | `60` | `30`, `100`, `120` |
-| `cache_ttl` | Cache duration in seconds | `300` | `600`, `1800`, `3600` |
+| `language` | Two-letter language code (ISO 639-1) or language-country format | `"en"` | `"en"`, `"fr"`, `"de"`, `"en-US"`, `"fr-FR"` |
+| `country` | Two-letter country code (ISO 3166-1 alpha-2) | `"US"` | `"US"`, `"GB"`, `"DE"`, `"JP"` |
+| `requests_per_minute` | Rate limit threshold for API requests | `60` | `30`, `100`, `120` |
+| `cache_ttl` | Cache duration in seconds for responses | `300` | `600`, `1800`, `3600` |
+
+### Available Topics
+
+The `top_news()` method supports the following topics:
+- `"WORLD"` - World news
+- `"NATION"` - National news
+- `"BUSINESS"` - Business news
+- `"TECHNOLOGY"` - Technology news
+- `"ENTERTAINMENT"` - Entertainment news
+- `"SPORTS"` - Sports news
+- `"SCIENCE"` - Science news
+- `"HEALTH"` - Health news
+
+### Time-Based Search
+
+The library supports two types of time-based search:
+
+1. **Date Range Search**
+   - Use `after` and `before` parameters
+   - Format: `YYYY-MM-DD`
+   - Maximum 100 results
+   - Example: `after="2024-01-01", before="2024-03-01"`
+
+2. **Relative Time Search**
+   - Use the `when` parameter
+   - Hours: `"1h"` to `"101h"`
+   - Days: Any number of days (e.g., `"7d"`, `"30d"`)
+   - Cannot be used with `after`/`before`
+   - Example: `when="24h"` for last 24 hours
+
+### Article Structure
+
+Each article in the results contains the following fields:
+- `title`: Article title
+- `link`: Google News article URL
+- `published`: Publication date and time
+- `summary`: Article summary/description
+- `source`: News source name
 
 ## Error Handling
 
@@ -185,6 +268,9 @@ poetry run pytest
 
 # Run tests with coverage
 poetry run pytest --cov=google_news_api
+
+# Run pre-commit on all files
+pre-commit run --all-files
 ```
 
 ## Contributing
@@ -204,6 +290,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Author
 
 Paolo Mazza (mazzapaolo2019@gmail.com)
+
+## Acknowledgments
+
+- The URL decoding functionality is based on the work of [SSujitX/google-news-url-decoder](https://github.com/SSujitX/google-news-url-decoder)
 
 ## Support
 
