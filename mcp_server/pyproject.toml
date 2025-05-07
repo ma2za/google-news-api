@@ -1,0 +1,15 @@
+[project]
+name = "mcp-server"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "aiohttp>=3.11.18",
+    "google-news-api",
+    "mcp[cli]>=1.6.0",
+    "trafilatura>=2.0.0",
+]
+
+[tool.uv.sources]
+google-news-api = { workspace = true }
