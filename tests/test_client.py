@@ -1,5 +1,6 @@
 """Tests for the Google News client."""
 
+import asyncio
 import json
 import os
 import tempfile
@@ -1020,3 +1021,121 @@ async def test_async_batch_search_error_handling():
         # Invalid query should return empty list
         assert "" in results
         assert results[""] == []
+
+
+@pytest.mark.asyncio
+async def test_decode_url():
+    """Test decoding a single Google News URL."""
+    async with AsyncGoogleNewsClient() as client:
+        # Test with a valid Google News URL
+        article_id = "CBMirgFBVV95cUxQWnRVLVptT01vMkdUWFhfTC1Ia1ROU1JDaE84T2RkRTgwemRFRUQxMkhUSXc1ZHowLWJGRjlaLVp4YmhMZ0FQRUpoU2hiY3dsbDBtMExBRmp6OFRtVHVCeGMwcTFMVlQwV0F6Yy1ILS05eXQ5a2p3ZHJ1NVJqWXlOZHd2TU9wS1lZUk5FS1RMVnhwYXhrNkVVdVFYRUFNVGpfc29qR0FfTXF0eVoyU2c"  # noqa: E501
+        google_news_url = f"https://news.google.com/rss/articles/{article_id}"
+        decoded_url = await client.decode_url(google_news_url)
+
+        # Verify the decoded URL is different from the original
+        assert decoded_url != google_news_url
+        # Verify it's a valid URL
+        assert decoded_url.startswith(("http://", "https://"))
+        # Verify it's not a Google News URL
+        assert "news.google.com" not in decoded_url
+
+        # Test with an invalid URL format
+        with pytest.raises(ValidationError) as exc_info:
+            await client.decode_url("not-a-valid-url")
+        assert "URL must be a Google News article URL" in str(exc_info.value)
+
+        # Test with a non-Google News URL
+        with pytest.raises(ValidationError) as exc_info:
+            await client.decode_url("https://example.com/article")
+        assert "URL must be a Google News article URL" in str(exc_info.value)
+
+        # Test with a malformed Google News URL
+        with pytest.raises(ValidationError) as exc_info:
+            await client.decode_url("https://news.google.com/invalid")
+        assert "Invalid Google News URL format" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_decode_urls():
+    """Test batch decoding of multiple Google News URLs."""
+    async with AsyncGoogleNewsClient() as client:
+        # Test with multiple valid URLs
+        article_ids = [
+            "CBMirgFBVV95cUxQWnRVLVptT01vMkdUWFhfTC1Ia1ROU1JDaE84T2RkRTgwemRFRUQxMkhUSXc1ZHowLWJGRjlaLVp4YmhMZ0FQRUpoU2hiY3dsbDBtMExBRmp6OFRtVHVCeGMwcTFMVlQwV0F6Yy1ILS05eXQ5a2p3ZHJ1NVJqWXlOZHd2TU9wS1lZUk5FS1RMVnhwYXhrNkVVdVFYRUFNVGpfc29qR0FfTXF0eVoyU2c",  # noqa: E501
+            "CBMiggFBVV95cUxQdGhKdXAtalhPUWRwSTlkSWpHUWVaX0doU2pFMXJBQ2MwSzY5TWw0TkdHcTM3YVU4VGtNWk1faDY3OE5IczJWVXlTbWNwcldsMGlGb3pKbXktMDM0aU0xeVBGZnd6WkxRekhKUExlYmlJMkJ3anBXd25iSThYckEtNEpn",  # noqa: E501
+        ]
+        urls = [f"https://news.google.com/rss/articles/{id}" for id in article_ids]
+
+        decoded_urls = await client.decode_urls(urls)
+
+        # Verify we got the same number of URLs back
+        assert len(decoded_urls) == len(urls)
+        # Verify all decoded URLs are different from originals
+        assert all(decoded != original for decoded, original in zip(decoded_urls, urls))
+        # Verify all decoded URLs are valid
+        assert all(url.startswith(("http://", "https://")) for url in decoded_urls)
+        # Verify none are Google News URLs
+        assert all("news.google.com" not in url for url in decoded_urls)
+
+        # Test with empty list
+        assert await client.decode_urls([]) == []
+
+        # Test with invalid input type
+        with pytest.raises(ValidationError) as exc_info:
+            await client.decode_urls("not-a-list")
+        assert "urls must be a list of strings" in str(exc_info.value)
+
+        # Test with mixed valid and invalid URLs
+        mixed_article_ids = [
+            "CBMirgFBVV95cUxQWnRVLVptT01vMkdUWFhfTC1Ia1ROU1JDaE84T2RkRTgwemRFRUQxMkhUSXc1ZHowLWJGRjlaLVp4YmhMZ0FQRUpoU2hiY3dsbDBtMExBRmp6OFRtVHVCeGMwcTFMVlQwV0F6Yy1ILS05eXQ5a2p3ZHJ1NVJqWXlOZHd2TU9wS1lZUk5FS1RMVnhwYXhrNkVVdVFYRUFNVGpfc29qR0FfTXF0eVoyU2c",  # noqa: E501
+            "not-a-valid-url",
+            "https://example.com/article",
+        ]
+        mixed_urls = [
+            f"https://news.google.com/rss/articles/{id}" if "CBM" in id else id
+            for id in mixed_article_ids
+        ]
+
+        # Should process valid URLs and handle invalid ones gracefully
+        decoded_mixed = await client.decode_urls(mixed_urls)
+        assert len(decoded_mixed) == len(mixed_urls)
+
+        # First URL should be decoded successfully
+        assert decoded_mixed[0] != mixed_urls[0]
+        assert decoded_mixed[0].startswith(("http://", "https://"))
+        assert "news.google.com" not in decoded_mixed[0]
+
+        # Invalid URLs should be logged but not cause the entire batch to fail
+        # They should be returned as None or empty string to indicate failure
+        assert decoded_mixed[1] is None or decoded_mixed[1] == ""
+        assert decoded_mixed[2] is None or decoded_mixed[2] == ""
+
+
+@pytest.mark.asyncio
+async def test_decode_urls_concurrency():
+    """Test concurrent URL decoding with different concurrency limits."""
+    async with AsyncGoogleNewsClient() as client:
+        # Create a list of identical URLs to test concurrency
+        article_id = "CBMirgFBVV95cUxQWnRVLVptT01vMkdUWFhfTC1Ia1ROU1JDaE84T2RkRTgwemRFRUQxMkhUSXc1ZHowLWJGRjlaLVp4YmhMZ0FQRUpoU2hiY3dsbDBtMExBRmp6OFRtVHVCeGMwcTFMVlQwV0F6Yy1ILS05eXQ5a2p3ZHJ1NVJqWXlOZHd2TU9wS1lZUk5FS1RMVnhwYXhrNkVVdVFYRUFNVGpfc29qR0FfTXF0eVoyU2c"  # noqa: E501
+        base_url = f"https://news.google.com/rss/articles/{article_id}"
+        urls = [base_url] * 10  # Test with 10 identical URLs
+
+        # Test with different concurrency limits
+        for max_concurrent in [1, 2, 5, 10]:
+            start_time = asyncio.get_event_loop().time()
+            decoded_urls = await client.decode_urls(urls, max_concurrent=max_concurrent)
+            end_time = asyncio.get_event_loop().time()
+
+            # Verify all URLs were decoded
+            assert len(decoded_urls) == len(urls)
+            assert all(url.startswith(("http://", "https://")) for url in decoded_urls)
+            assert all("news.google.com" not in url for url in decoded_urls)
+
+            # Verify all decoded URLs are the same (since input URLs were identical)
+            assert len(set(decoded_urls)) == 1
+
+            # Log the time taken for each concurrency level
+            print(
+                f"Time taken with max_concurrent={max_concurrent}: "
+                f"{end_time - start_time:.2f}s"
+            )
