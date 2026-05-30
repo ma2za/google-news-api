@@ -159,9 +159,9 @@ modes:
 
 | Mode | Backend | Best For |
 |------|---------|----------|
-| `"default"` | Google News RSS | Fast baseline discovery and broad coverage |
-| `"searchapi_portal"` | [SearchAPI Google News Portal](https://www.searchapi.io/docs/google-news-portal-api) | Direct publisher URLs with coverage closest to default mode |
-| `"searchapi_light"` | [SearchAPI Google News Light](https://www.searchapi.io/docs/google-news-light-api) | Fresh results, snippets, and direct publisher URLs |
+| `"default"` | Google News RSS | Fast baseline |
+| `"searchapi_portal"` | [SearchAPI Google News Portal](https://www.searchapi.io/docs/google-news-portal-api) | Direct publisher URLs |
+| `"searchapi_light"` | [SearchAPI Google News Light](https://www.searchapi.io/docs/google-news-light-api) | Fresh results and snippets |
 
 [SearchAPI](https://www.searchapi.io/) modes require an API key:
 
@@ -200,13 +200,8 @@ light_articles = client.search(
 )
 ```
 
-Recommended use:
-
-- Use `"default"` for the fastest and most complete baseline when Google News
-  URLs are acceptable.
-- Use `"searchapi_portal"` when direct publisher URLs matter and you want
-  results closest to Google News RSS.
-- Use `"searchapi_light"` when snippets and freshness matter.
+In practice, use `"default"` first. Switch to `"searchapi_portal"` for direct
+publisher URLs, or `"searchapi_light"` for snippet-heavy recent searches.
 
 ## Configuration
 
