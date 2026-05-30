@@ -1139,3 +1139,128 @@ async def test_decode_urls_concurrency():
                 f"Time taken with max_concurrent={max_concurrent}: "
                 f"{end_time - start_time:.2f}s"
             )
+
+
+def test_search_mode_validation():
+    client = GoogleNewsClient()
+    with pytest.raises(ValidationError) as exc_info:
+        client.search("test", mode="invalid")
+    assert "mode must be one of" in str(exc_info.value)
+
+
+def test_searchapi_light_mode(monkeypatch):
+    import httpx
+
+    client = GoogleNewsClient()
+    monkeypatch.setenv("SEARCHAPI_API_KEY", "test-key")
+
+    def mock_get(url, params=None, timeout=None, **kwargs):
+        assert params["engine"] == "google_news_light"
+        assert params["q"] == "python"
+        assert params["api_key"] == "test-key"
+        assert params["gl"] == "us"
+        assert params["hl"] == "en"
+        return httpx.Response(
+            200,
+            json={
+                "organic_results": [
+                    {
+                        "title": "Python News",
+                        "link": "https://example.com/python",
+                        "source": "Example",
+                        "date": "2026-05-22",
+                        "snippet": "Python summary",
+                    }
+                ]
+            },
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(client._client, "get", mock_get)
+
+    articles = client.search("python", mode="searchapi_light")
+
+    assert articles == [
+        {
+            "title": "Python News",
+            "link": "https://example.com/python",
+            "published": "2026-05-22",
+            "summary": "Python summary",
+            "source": "Example",
+        }
+    ]
+
+
+def test_searchapi_portal_mode(monkeypatch):
+    import httpx
+
+    client = GoogleNewsClient()
+    monkeypatch.setenv("SEARCHAPI_API_KEY", "test-key")
+
+    def mock_get(url, params=None, timeout=None, **kwargs):
+        assert params["engine"] == "google_news_portal"
+        assert params["q"] == "python"
+        assert params["api_key"] == "test-key"
+        assert params["ceid"] == "US:en"
+        return httpx.Response(
+            200,
+            json={
+                "organic_results": [
+                    {
+                        "title": "Portal News",
+                        "link": "https://example.com/portal",
+                        "source": {"name": "Portal Source"},
+                        "iso_date": "2026-05-22T12:00:00Z",
+                        "snippet": "Portal summary",
+                    }
+                ]
+            },
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(client._client, "get", mock_get)
+
+    articles = client.search("python", mode="searchapi_portal")
+
+    assert articles == [
+        {
+            "title": "Portal News",
+            "link": "https://example.com/portal",
+            "published": "2026-05-22T12:00:00Z",
+            "summary": "Portal summary",
+            "source": "Portal Source",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_async_searchapi_light_mode(monkeypatch):
+    import httpx
+
+    monkeypatch.setenv("SEARCHAPI_API_KEY", "test-key")
+
+    async with AsyncGoogleNewsClient() as client:
+
+        async def mock_get(url, params=None, timeout=None, **kwargs):
+            assert params["engine"] == "google_news_light"
+            return httpx.Response(
+                200,
+                json={
+                    "organic_results": [
+                        {
+                            "title": "Async News",
+                            "link": "https://example.com/async",
+                            "source": "Example",
+                            "date": "2026-05-22",
+                            "snippet": "Async summary",
+                        }
+                    ]
+                },
+                request=httpx.Request("GET", url),
+            )
+
+        monkeypatch.setattr(client.client, "get", mock_get)
+
+        articles = await client.search("python", mode="searchapi_light")
+
+    assert articles[0]["title"] == "Async News"

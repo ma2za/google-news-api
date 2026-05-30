@@ -28,6 +28,7 @@ from .exceptions import (
     RateLimitError,
     ValidationError,
 )
+from .providers import DEFAULT_MODE, SEARCHAPI_PROVIDER, validate_mode
 from .utils import (
     AsyncCache,
     AsyncRateLimiter,
@@ -376,6 +377,7 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         before: Optional[str] = None,
         when: Optional[str] = None,
         max_results: Optional[int] = None,
+        mode: str = DEFAULT_MODE,
     ) -> List[Dict[str, Any]]:
         """Search for news articles.
 
@@ -385,6 +387,8 @@ class GoogleNewsClient(BaseGoogleNewsClient):
             before: End date in YYYY-MM-DD format
             when: Relative time range (e.g., "1h", "7d")
             max_results: Maximum number of results to return
+            mode: Search backend. One of "default", "searchapi_light",
+                or "searchapi_portal"
 
         Returns:
             List of article dictionaries
@@ -396,6 +400,7 @@ class GoogleNewsClient(BaseGoogleNewsClient):
             - after/before and when parameters are mutually exclusive
         """
         self._validate_query(query)
+        validate_mode(mode)
 
         # Build query with time parameters
         query_parts = [query]
@@ -418,6 +423,16 @@ class GoogleNewsClient(BaseGoogleNewsClient):
                 query_parts.append(f"before:{before}")
 
         final_query = " ".join(query_parts)
+        if mode != DEFAULT_MODE:
+            return SEARCHAPI_PROVIDER.search(
+                self._client,
+                final_query,
+                mode,
+                self.country,
+                self.language_base,
+                max_results,
+            )
+
         url = self._build_url(f"search?q={final_query}")
         feed = self._fetch_feed(url)
         return self._parse_articles(feed, max_results)
@@ -430,6 +445,7 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         before: Optional[str] = None,
         when: Optional[str] = None,
         max_results: Optional[int] = None,
+        mode: str = DEFAULT_MODE,
     ) -> Dict[str, List[Dict[str, Any]]]:
         """Perform multiple searches in batch.
 
@@ -439,6 +455,8 @@ class GoogleNewsClient(BaseGoogleNewsClient):
             before: End date in YYYY-MM-DD format
             when: Relative time range (e.g., "1h", "7d")
             max_results: Maximum number of results to return per query
+            mode: Search backend. One of "default", "searchapi_light",
+                or "searchapi_portal"
 
         Returns:
             Dictionary mapping each query to its list of article results
@@ -458,6 +476,7 @@ class GoogleNewsClient(BaseGoogleNewsClient):
                 field="queries",
                 value=queries,
             )
+        validate_mode(mode)
 
         # Validate time parameters once before running searches
         if when is not None:
@@ -483,6 +502,7 @@ class GoogleNewsClient(BaseGoogleNewsClient):
                     before=before,
                     when=when,
                     max_results=max_results,
+                    mode=mode,
                 )
             except ValidationError as e:
                 logger.error(f"Error searching for query '{query}': {str(e)}")
@@ -495,8 +515,13 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         topic: str = "WORLD",
         *,
         max_results: Optional[int] = None,
+        mode: str = DEFAULT_MODE,
     ) -> List[Dict[str, Any]]:
         """Get top news articles for a topic."""
+        validate_mode(mode)
+        if mode != DEFAULT_MODE:
+            return self.search(topic, max_results=max_results, mode=mode)
+
         path = self._get_topic_path(topic)
         url = self._build_url(path)
         feed = self._fetch_feed(url)
@@ -575,6 +600,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         before: Optional[str] = None,
         when: Optional[str] = None,
         max_results: Optional[int] = None,
+        mode: str = DEFAULT_MODE,
     ) -> List[Dict[str, Any]]:
         """Search for news articles asynchronously.
 
@@ -584,6 +610,8 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
             before: End date in YYYY-MM-DD format
             when: Relative time range (e.g., "1h", "7d")
             max_results: Maximum number of results to return
+            mode: Search backend. One of "default", "searchapi_light",
+                or "searchapi_portal"
 
         Returns:
             List of article dictionaries
@@ -595,6 +623,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
             - after/before and when parameters are mutually exclusive
         """
         self._validate_query(query)
+        validate_mode(mode)
 
         # Build query with time parameters
         query_parts = [query]
@@ -617,6 +646,16 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
                 query_parts.append(f"before:{before}")
 
         final_query = " ".join(query_parts)
+        if mode != DEFAULT_MODE:
+            return await SEARCHAPI_PROVIDER.search_async(
+                self.client,
+                final_query,
+                mode,
+                self.country,
+                self.language_base,
+                max_results,
+            )
+
         url = self._build_url(f"search?q={final_query}")
         feed = await self._fetch_feed(url)
         return self._parse_articles(feed, max_results)
@@ -632,6 +671,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         max_concurrent: int = 5,
         timeout: float = 30.0,
         delay: float = 1.0,
+        mode: str = DEFAULT_MODE,
     ) -> Dict[str, List[Dict[str, Any]]]:
         """Perform multiple searches in batch asynchronously.
 
@@ -644,6 +684,8 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
             max_concurrent: Maximum number of concurrent requests
             timeout: Timeout in seconds for each request
             delay: Delay in seconds between requests to avoid rate limiting
+            mode: Search backend. One of "default", "searchapi_light",
+                or "searchapi_portal"
 
         Returns:
             Dictionary mapping each query to its list of article results
@@ -665,6 +707,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
                 field="queries",
                 value=queries,
             )
+        validate_mode(mode)
 
         # Validate time parameters once before running searches
         if when is not None:
@@ -696,6 +739,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
                         before=before,
                         when=when,
                         max_results=max_results,
+                        mode=mode,
                     )
                     pbar.update(1)
                     return query, results
@@ -719,8 +763,13 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         topic: str = "WORLD",
         *,
         max_results: Optional[int] = None,
+        mode: str = DEFAULT_MODE,
     ) -> List[Dict[str, Any]]:
         """Get top news articles for a topic asynchronously."""
+        validate_mode(mode)
+        if mode != DEFAULT_MODE:
+            return await self.search(topic, max_results=max_results, mode=mode)
+
         path = self._get_topic_path(topic)
         url = self._build_url(path)
         feed = await self._fetch_feed(url)
