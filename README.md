@@ -152,6 +152,62 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+## Search Modes
+
+The `search()`, `batch_search()`, and `top_news()` methods support three search
+modes:
+
+| Mode | Backend | Best For |
+|------|---------|----------|
+| `"default"` | Google News RSS | Fast baseline discovery and broad coverage |
+| `"searchapi_portal"` | [SearchAPI Google News Portal](https://www.searchapi.io/docs/google-news-portal-api) | Direct publisher URLs with coverage closest to default mode |
+| `"searchapi_light"` | [SearchAPI Google News Light](https://www.searchapi.io/docs/google-news-light-api) | Fresh results, snippets, and direct publisher URLs |
+
+[SearchAPI](https://www.searchapi.io/) modes require an API key:
+
+```bash
+export SEARCHAPI_API_KEY="your-api-key"
+```
+
+Windows PowerShell:
+
+```powershell
+$env:SEARCHAPI_API_KEY = "your-api-key"
+```
+
+Example:
+
+```python
+from google_news_api import GoogleNewsClient
+
+client = GoogleNewsClient(language="en", country="US")
+
+default_articles = client.search(
+    "artificial intelligence regulation",
+    max_results=10,
+)
+
+portal_articles = client.search(
+    "artificial intelligence regulation",
+    max_results=10,
+    mode="searchapi_portal",
+)
+
+light_articles = client.search(
+    "artificial intelligence regulation",
+    max_results=10,
+    mode="searchapi_light",
+)
+```
+
+Recommended use:
+
+- Use `"default"` for the fastest and most complete baseline when Google News
+  URLs are acceptable.
+- Use `"searchapi_portal"` when direct publisher URLs matter and you want
+  results closest to Google News RSS.
+- Use `"searchapi_light"` when snippets and freshness matter.
+
 ## Configuration
 
 The library provides extensive configuration options through the client initialization:
