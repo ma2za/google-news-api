@@ -214,12 +214,15 @@ class BaseGoogleNewsClient(ABC):
             The complete URL
         """
         if path.startswith("search"):
-            # Extract query parameters
-            query_parts = path.split("q=")[1].split("&")[0] if "q=" in path else ""
+            # Everything after the first "q=" is the raw query string.
+            # We must NOT split on "&" or convert "+" to spaces here: doing
+            # so corrupts queries that legitimately contain those characters
+            # (e.g. "AT&T", "C++"). urlencode() below handles all escaping.
+            query = path.split("q=", 1)[1] if "q=" in path else ""
 
             # Build base parameters
             params = {
-                "q": query_parts.replace("+", " "),
+                "q": query,
                 "hl": self.language_full,
                 "gl": self.country,
                 "ceid": f"{self.country}:{self.language_base}",

@@ -701,6 +701,28 @@ def test_client_url_building():
     assert "gl=US" in custom_url
 
 
+def test_build_url_preserves_special_characters():
+    """Queries with &, +, or q= must survive URL building intact.
+
+    Regression test: the previous implementation split the embedded query
+    on "&", stripped everything after a second "q=", and turned "+" into
+    spaces, silently corrupting queries such as "AT&T" or "C++".
+    """
+    from urllib.parse import parse_qs, urlparse
+
+    client = GoogleNewsClient()
+
+    def extract_query(query: str) -> str:
+        url = client._build_url(f"search?q={query}")
+        return parse_qs(urlparse(url).query)["q"][0]
+
+    assert extract_query("AT&T") == "AT&T"
+    assert extract_query("Procter & Gamble") == "Procter & Gamble"
+    assert extract_query("C++ programming") == "C++ programming"
+    assert extract_query("speed of q=mc2") == "speed of q=mc2"
+    assert extract_query("python programming") == "python programming"
+
+
 def test_client_error_handling():
     """Test error handling in the client."""
     import httpx
