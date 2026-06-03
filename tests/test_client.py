@@ -24,7 +24,7 @@ def test_client_initialization():
     """Test that the client initializes with default values."""
     client = GoogleNewsClient()
     assert client.language_base == "en"
-    assert client.language_full == "EN-US"
+    assert client.language_full == "en-US"
     assert client.country == "US"
 
 
@@ -32,7 +32,7 @@ def test_client_custom_initialization():
     """Test that the client initializes with custom values."""
     client = GoogleNewsClient(language="es", country="ES")
     assert client.language_base == "es"
-    assert client.language_full == "ES-ES"
+    assert client.language_full == "es-ES"
     assert client.country == "ES"
 
 
@@ -54,8 +54,22 @@ def test_client_language_country_format():
     """Test language-country format initialization."""
     client = GoogleNewsClient(language="en-GB", country="GB")
     assert client.language_base == "en"
-    assert client.language_full == "EN-GB"
+    assert client.language_full == "en-GB"
     assert client.country == "GB"
+
+
+def test_language_full_uses_canonical_hl_casing():
+    """`hl` must use canonical lowercase-language-UPPERCASE-region casing.
+
+    Google News 302-redirects a non-canonical value like "EN-US" (dropping the
+    `hl` hint), so the client must emit the documented "en-US" form to avoid an
+    extra round-trip on every request. Casing of the input is normalized.
+    """
+    assert GoogleNewsClient(language="en", country="US").language_full == "en-US"
+    assert GoogleNewsClient(language="fr", country="FR").language_full == "fr-FR"
+    # language-country input, mixed casing, is normalized too
+    assert GoogleNewsClient(language="en-gb", country="GB").language_full == "en-GB"
+    assert GoogleNewsClient(language="EN-US", country="US").language_full == "en-US"
 
 
 def test_client_empty_query():
@@ -683,7 +697,7 @@ def test_client_url_building():
     # Test search URL
     search_url = client._build_url("search?q=test")
     assert "q=test" in search_url
-    assert "hl=EN-US" in search_url
+    assert "hl=en-US" in search_url
     assert "gl=US" in search_url
 
     # Test empty path (default to WORLD)
@@ -697,7 +711,7 @@ def test_client_url_building():
     # Test custom path
     custom_url = client._build_url("custom/path")
     assert "custom/path" in custom_url
-    assert "hl=EN-US" in custom_url
+    assert "hl=en-US" in custom_url
     assert "gl=US" in custom_url
 
 
