@@ -263,7 +263,11 @@ class BaseGoogleNewsClient(ABC):
     ) -> List[Dict[str, Any]]:
         if max_results == 0:
             return []
-        articles = feed.entries[:max_results] if max_results else feed.entries
+        # A positive value caps the results; None or a negative value (treated
+        # as "no limit") returns everything. Slicing with a raw negative
+        # max_results would silently drop the last article(s).
+        limit = max_results if max_results and max_results > 0 else None
+        articles = feed.entries[:limit] if limit else feed.entries
         return [
             {
                 "title": entry.title,
