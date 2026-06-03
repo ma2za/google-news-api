@@ -822,6 +822,45 @@ def test_parse_articles():
     assert articles[0]["source"] is None
 
 
+def test_parse_articles_negative_max_results_returns_all():
+    """A negative max_results is treated as None (return everything).
+
+    Regression test: ``feed.entries[:max_results]`` with a negative value
+    silently dropped the last article(s) (e.g. -1 returned all but one).
+    """
+    from feedparser import FeedParserDict
+
+    client = GoogleNewsClient()
+    entries = []
+    for i in range(5):
+        entry = FeedParserDict()
+        entry.title = f"Test {i}"
+        entry.link = f"http://test.com/{i}"
+        entry.published = "2024-01-01"
+        entry.summary = ""
+        entries.append(entry)
+    feed = FeedParserDict()
+    feed.entries = entries
+
+    assert len(client._parse_articles(feed, max_results=-1)) == 5
+    assert len(client._parse_articles(feed, max_results=None)) == 5
+    assert len(client._parse_articles(feed, max_results=3)) == 3
+    assert client._parse_articles(feed, max_results=0) == []
+
+
+def test_searchapi_normalize_negative_max_results_returns_all():
+    """SearchAPI normalization mirrors the default-mode max_results handling."""
+    from google_news_api.providers import SearchAPIProvider
+
+    provider = SearchAPIProvider()
+    articles = [{"title": f"a{i}", "link": "x", "snippet": "s"} for i in range(5)]
+
+    assert len(provider._normalize_articles(articles, max_results=-1)) == 5
+    assert len(provider._normalize_articles(articles, max_results=None)) == 5
+    assert len(provider._normalize_articles(articles, max_results=3)) == 3
+    assert provider._normalize_articles(articles, max_results=0) == []
+
+
 def test_batch_search():
     """Test synchronous batch search functionality."""
     client = GoogleNewsClient()

@@ -41,7 +41,9 @@ class SearchAPIProvider:
         max_results: Optional[int],
     ) -> List[Dict[str, Any]]:
         params = self._params(query, mode, country, language)
-        limit = max_results or 100
+        # A negative max_results is treated as "no limit" (like None): fall back
+        # to the default ceiling instead of disabling the pagination loop.
+        limit = max_results if max_results and max_results > 0 else 100
         articles = []
         seen_titles = set()
 
@@ -75,7 +77,9 @@ class SearchAPIProvider:
         max_results: Optional[int],
     ) -> List[Dict[str, Any]]:
         params = self._params(query, mode, country, language)
-        limit = max_results or 100
+        # A negative max_results is treated as "no limit" (like None): fall back
+        # to the default ceiling instead of disabling the pagination loop.
+        limit = max_results if max_results and max_results > 0 else 100
         articles = []
         seen_titles = set()
 
@@ -175,7 +179,8 @@ class SearchAPIProvider:
         if max_results == 0:
             return []
 
-        selected = articles[:max_results] if max_results else articles
+        limit = max_results if max_results and max_results > 0 else None
+        selected = articles[:limit] if limit else articles
         return [
             {
                 "title": article.get("title"),
