@@ -805,19 +805,50 @@ def test_parse_articles():
     articles = client._parse_articles(feed, max_results=0)
     assert len(articles) == 0
 
-    # Test feed with missing optional fields
+    # Test feed with missing optional fields. Build the entry the way
+    # feedparser actually populates it (dict items), so attribute *and*
+    # mapping access (.get) both resolve, matching real feeds.
     feed = FeedParserDict()
-    entry = FeedParserDict()
-    entry.title = "Test"
-    entry.link = "http://test.com"
-    entry.published = "2024-01-01"
-    entry.summary = ""
+    entry = FeedParserDict(
+        {
+            "title": "Test",
+            "link": "http://test.com",
+            "published": "2024-01-01",
+            "summary": "",
+        }
+    )
     feed.entries = [entry]
     articles = client._parse_articles(feed)
     assert len(articles) == 1
     assert articles[0]["title"] == "Test"
     assert articles[0]["link"] == "http://test.com"
     assert articles[0]["published"] == "2024-01-01"
+    assert articles[0]["summary"] == ""
+    assert articles[0]["source"] is None
+
+
+def test_parse_articles_tolerates_missing_fields():
+    """A feed entry missing title/link/published must not crash parsing.
+
+    Regression test: title/link/published were read via attribute access
+    (``entry.title``), which raised AttributeError on entries that omit a
+    field, aborting the entire search instead of yielding None for it.
+    """
+    from feedparser import FeedParserDict
+
+    client = GoogleNewsClient()
+
+    # link / published intentionally absent, as real feeds sometimes omit them
+    entry = FeedParserDict({"title": "Only a title"})
+    feed = FeedParserDict()
+    feed.entries = [entry]
+
+    articles = client._parse_articles(feed)
+
+    assert len(articles) == 1
+    assert articles[0]["title"] == "Only a title"
+    assert articles[0]["link"] is None
+    assert articles[0]["published"] is None
     assert articles[0]["summary"] == ""
     assert articles[0]["source"] is None
 

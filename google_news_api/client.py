@@ -257,9 +257,13 @@ class BaseGoogleNewsClient(ABC):
         articles = feed.entries[:max_results] if max_results else feed.entries
         return [
             {
-                "title": entry.title,
-                "link": entry.link,
-                "published": entry.published,
+                # Use .get() so an entry missing an expected field yields None
+                # instead of raising AttributeError. RSS items occasionally omit
+                # fields, and a single malformed item should not abort the
+                # whole search.
+                "title": entry.get("title"),
+                "link": entry.get("link"),
+                "published": entry.get("published"),
                 "summary": entry.get("summary", ""),
                 "source": entry.source.title if "source" in entry else None,
             }
