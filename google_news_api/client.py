@@ -110,9 +110,15 @@ class BaseGoogleNewsClient(ABC):
         self._validate_language(language)
         self._validate_country(country)
 
-        self.language_full = (
-            language.upper() if "-" in language else f"{language.upper()}-{country}"
-        )
+        # Build the canonical "hl" value as lowercase-language-UPPERCASE-region
+        # (e.g. "en-US"). Google News redirects a non-canonical value such as
+        # "EN-US" (302) and drops the "hl" hint in the process, so emitting the
+        # documented casing avoids an extra round-trip on every request.
+        if "-" in language:
+            lang, _, region = language.partition("-")
+            self.language_full = f"{lang.lower()}-{region.upper()}"
+        else:
+            self.language_full = f"{language.lower()}-{country.upper()}"
         self.language_base = language.split("-")[0].lower()
         self.country = country.upper()
         self._setup_rate_limiter_and_cache(requests_per_minute, cache_ttl)
