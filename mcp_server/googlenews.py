@@ -64,6 +64,27 @@ async def extract_article_text(
         return None
 
 
+def _attach_extracted_text(
+    articles: List[dict[str, Any]],
+    decoded_urls: List[Optional[str]],
+    extracted_texts: List[Optional[str]],
+) -> List[dict[str, Any]]:
+    """Attach the decoded link and extracted text to each article.
+
+    ``decoded_urls`` and ``extracted_texts`` are positionally aligned with
+    ``articles`` (one entry each; ``None`` where decoding was skipped/failed).
+    For a successfully decoded article the original Google link is preserved in
+    ``google_link`` *before* ``link`` is overwritten. Articles whose URL could
+    not be decoded are left untouched.
+    """
+    for article, decoded_url, text in zip(articles, decoded_urls, extracted_texts):
+        if decoded_url:  # Only update if decoding was successful
+            article["google_link"] = article["link"]
+            article["link"] = decoded_url
+            article["text"] = text or ""
+    return articles
+
+
 @mcp.tool()
 async def news_search(
     query: str,
@@ -117,14 +138,7 @@ async def news_search(
                 *(maybe_extract(url) for url in decoded_urls)
             )
 
-            for article, decoded_url, text in zip(
-                articles, decoded_urls, extracted_texts
-            ):
-                if decoded_url:  # Only update if decoding was successful
-                    # Preserve the original Google link *before* overwriting it.
-                    article["google_link"] = article["link"]
-                    article["link"] = decoded_url
-                    article["text"] = text or ""
+            _attach_extracted_text(articles, decoded_urls, extracted_texts)
 
         return articles
     except Exception as e:
@@ -177,14 +191,7 @@ async def top_news(
                 *(maybe_extract(url) for url in decoded_urls)
             )
 
-            for article, decoded_url, text in zip(
-                articles, decoded_urls, extracted_texts
-            ):
-                if decoded_url:  # Only update if decoding was successful
-                    # Preserve the original Google link *before* overwriting it.
-                    article["google_link"] = article["link"]
-                    article["link"] = decoded_url
-                    article["text"] = text or ""
+            _attach_extracted_text(articles, decoded_urls, extracted_texts)
 
         return articles
     except Exception as e:
