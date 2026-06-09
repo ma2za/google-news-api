@@ -64,6 +64,27 @@ async def extract_article_text(
         return None
 
 
+def _attach_extracted_text(
+    articles: List[dict[str, Any]],
+    decoded_urls: List[Optional[str]],
+    extracted_texts: List[Optional[str]],
+) -> List[dict[str, Any]]:
+    """Attach the decoded link and extracted text to each article.
+
+    ``decoded_urls`` and ``extracted_texts`` are positionally aligned with
+    ``articles`` (one entry each; ``None`` where decoding was skipped/failed).
+    For a successfully decoded article the original Google link is preserved in
+    ``google_link`` *before* ``link`` is overwritten. Articles whose URL could
+    not be decoded are left untouched.
+    """
+    for article, decoded_url, text in zip(articles, decoded_urls, extracted_texts):
+        if decoded_url:  # Only update if decoding was successful
+            article["google_link"] = article["link"]
+            article["link"] = decoded_url
+            article["text"] = text or ""
+    return articles
+
+
 @mcp.tool()
 async def news_search(
     query: str,
@@ -102,31 +123,22 @@ async def news_search(
             urls_to_decode, max_concurrent=5, timeout=30.0, delay=1.0
         )
 
-        # Update articles with decoded URLs and extract text
+        # Update articles with decoded URLs and extract their text. Build one
+        # extraction coroutine per article (None when the URL was not decoded)
+        # so gather() returns texts positionally aligned with `articles`: a
+        # single failed decode must not shift the rest or raise IndexError.
         async with aiohttp.ClientSession() as session:
-            extraction_tasks = []
-            for article, decoded_url in zip(articles, decoded_urls):
-                if decoded_url:  # Only update if decoding was successful
-                    article["link"] = decoded_url
-                    # Preserve original Google link
-                    article["google_link"] = article["link"]
-                    # Add text extraction task
-                    task = extract_article_text(decoded_url, session)
-                    extraction_tasks.append(task)
-                else:
-                    extraction_tasks.append(None)
 
-            # Wait for all text extractions to complete
+            async def maybe_extract(decoded_url: Optional[str]) -> Optional[str]:
+                if not decoded_url:
+                    return None
+                return await extract_article_text(decoded_url, session)
+
             extracted_texts = await asyncio.gather(
-                *[task for task in extraction_tasks if task is not None]
+                *(maybe_extract(url) for url in decoded_urls)
             )
 
-            # Add extracted texts to articles
-            text_idx = 0
-            for article in articles:
-                if "error" not in article and article.get("link"):
-                    article["text"] = extracted_texts[text_idx] or ""
-                    text_idx += 1
+            _attach_extracted_text(articles, decoded_urls, extracted_texts)
 
         return articles
     except Exception as e:
@@ -164,31 +176,22 @@ async def top_news(
             urls_to_decode, max_concurrent=5, timeout=30.0, delay=1.0
         )
 
-        # Update articles with decoded URLs and extract text
+        # Update articles with decoded URLs and extract their text. Build one
+        # extraction coroutine per article (None when the URL was not decoded)
+        # so gather() returns texts positionally aligned with `articles`: a
+        # single failed decode must not shift the rest or raise IndexError.
         async with aiohttp.ClientSession() as session:
-            extraction_tasks = []
-            for article, decoded_url in zip(articles, decoded_urls):
-                if decoded_url:  # Only update if decoding was successful
-                    article["link"] = decoded_url
-                    # Preserve original Google link
-                    article["google_link"] = article["link"]
-                    # Add text extraction task
-                    task = extract_article_text(decoded_url, session)
-                    extraction_tasks.append(task)
-                else:
-                    extraction_tasks.append(None)
 
-            # Wait for all text extractions to complete
+            async def maybe_extract(decoded_url: Optional[str]) -> Optional[str]:
+                if not decoded_url:
+                    return None
+                return await extract_article_text(decoded_url, session)
+
             extracted_texts = await asyncio.gather(
-                *[task for task in extraction_tasks if task is not None]
+                *(maybe_extract(url) for url in decoded_urls)
             )
 
-            # Add extracted texts to articles
-            text_idx = 0
-            for article in articles:
-                if "error" not in article and article.get("link"):
-                    article["text"] = extracted_texts[text_idx] or ""
-                    text_idx += 1
+            _attach_extracted_text(articles, decoded_urls, extracted_texts)
 
         return articles
     except Exception as e:
