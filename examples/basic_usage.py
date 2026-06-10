@@ -33,34 +33,31 @@ def sync_example():
     print("\n=== Synchronous Client Example ===")
 
     # Create a client
-    client = GoogleNewsClient(
+    with GoogleNewsClient(
         language="en", country="US", requests_per_minute=60, cache_ttl=300
-    )
+    ) as client:
+        try:
+            # Get top news
+            print("\nFetching top news...")
+            articles = client.top_news(max_results=3)
+            for article in articles:
+                print_article(article)
 
-    try:
-        # Get top news
-        print("\nFetching top news...")
-        articles = client.top_news(max_results=3)
-        for article in articles:
-            print_article(article)
+            # Search for a specific topic
+            topic = "python programming"
+            print(f"\nSearching for news about '{topic}'...")
+            articles = client.search(topic, max_results=3, when="1h")
+            for article in articles:
+                print_article(article)
 
-        # Search for a specific topic
-        topic = "python programming"
-        print(f"\nSearching for news about '{topic}'...")
-        articles = client.search(topic, max_results=3, when="1m")
-        for article in articles:
-            print_article(article)
-
-    except RateLimitError as e:
-        print(f"Rate limit exceeded: {e}")
-        print(f"Please wait {e.retry_after} seconds before trying again")
-    except HTTPError as e:
-        print(f"HTTP error occurred: {e}")
-        print(f"Status code: {e.status_code}")
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        del client
+        except RateLimitError as e:
+            print(f"Rate limit exceeded: {e}")
+            print(f"Please wait {e.retry_after} seconds before trying again")
+        except HTTPError as e:
+            print(f"HTTP error occurred: {e}")
+            print(f"Status code: {e.status_code}")
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
 
 async def async_example():

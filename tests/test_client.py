@@ -217,6 +217,10 @@ def test_search_with_date_range_validation():
         client.search("AI technology", before="24-1-1")
     assert "must be in YYYY-MM-DD format" in str(exc_info.value)
 
+    with pytest.raises(ValidationError) as exc_info:
+        client.search("AI technology", after="2024-99-99")
+    assert "must be a valid date in YYYY-MM-DD format" in str(exc_info.value)
+
 
 def test_search_with_relative_time():
     """Test searching with relative time parameters."""
@@ -402,6 +406,14 @@ def test_client_cleanup():
     """Test that client cleanup works properly."""
     client = GoogleNewsClient()
     del client  # Should close the client without errors
+
+
+def test_sync_client_context_manager_closes_client():
+    """Test that sync client context manager closes resources."""
+    with GoogleNewsClient() as client:
+        assert not client._client.is_closed
+
+    assert client._client.is_closed
 
 
 @pytest.mark.asyncio

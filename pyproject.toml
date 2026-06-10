@@ -1,6 +1,6 @@
 [project]
 name = "google-news-api"
-version = "0.0.8"
+version = "0.0.9"
 description = ""
 authors = [
     {name = "Paolo Mazza",email = "mazzapaolo2019@gmail.com"}

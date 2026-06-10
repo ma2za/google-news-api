@@ -30,6 +30,13 @@ def test_custom_client_config():
     assert config.cache_ttl == 600
 
 
+def test_client_config_language_country_format():
+    """Test language-country format configuration."""
+    config = ClientConfig(language="en-US", country="US")
+    assert config.language == "en-US"
+    assert config.country == "US"
+
+
 def test_invalid_language():
     """Test invalid language code."""
     with pytest.raises(ConfigurationError) as exc_info:

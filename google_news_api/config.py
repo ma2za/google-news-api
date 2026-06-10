@@ -70,9 +70,23 @@ class ClientConfig:
             ValueError: If numeric values are not positive
         """
         # Validate language code
-        if not isinstance(self.language, str) or len(self.language) != 2:
+        if not isinstance(self.language, str):
             raise ConfigurationError(
-                "Language must be a two-letter ISO 639-1 code",
+                "Language must be a two-letter ISO 639-1 "
+                "code or language-COUNTRY format",
+                field="language",
+                value=self.language,
+            )
+
+        language_parts = self.language.split("-")
+        if (
+            len(language_parts) > 2
+            or len(language_parts[0]) != 2
+            or (len(language_parts) == 2 and len(language_parts[1]) != 2)
+        ):
+            raise ConfigurationError(
+                "Language must be a two-letter ISO 639-1 "
+                "code or language-COUNTRY format",
                 field="language",
                 value=self.language,
             )

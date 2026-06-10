@@ -67,54 +67,49 @@ pip install google-news-api
 ```python
 from google_news_api import GoogleNewsClient
 
-# Initialize client with custom configuration
-client = GoogleNewsClient(
-    language="en",
-    country="US",
-    requests_per_minute=60,
-    cache_ttl=300
-)
-
 try:
     # Get top news by topic
-    world_news = client.top_news(topic="WORLD", max_results=5)
-    tech_news = client.top_news(topic="TECHNOLOGY", max_results=3)
-    
-    # Search with date range
-    date_articles = client.search(
-        "Ukraine war",
-        after="2024-01-01",
-        before="2024-03-01",
-        max_results=5
-    )
-    
-    # Search with relative time
-    recent_articles = client.search(
-        "climate change",
-        when="24h",  # Last 24 hours
-        max_results=5
-    )
-    
-    # Batch search multiple queries
-    batch_results = client.batch_search(
-        queries=["AI", "machine learning", "deep learning"],
-        when="7d",  # Last 7 days
-        max_results=3
-    )
-    
-    # Process results
-    for topic, articles in batch_results.items():
-        print(f"\nTop {topic} news:")
-        for article in articles:
-            print(f"- {article['title']} ({article['source']})")
-            print(f"  Published: {article['published']}")
-            print(f"  Summary: {article['summary'][:100]}...")
+    with GoogleNewsClient(
+        language="en",
+        country="US",
+        requests_per_minute=60,
+        cache_ttl=300
+    ) as client:
+        world_news = client.top_news(topic="WORLD", max_results=5)
+        tech_news = client.top_news(topic="TECHNOLOGY", max_results=3)
+        
+        # Search with date range
+        date_articles = client.search(
+            "Ukraine war",
+            after="2024-01-01",
+            before="2024-03-01",
+            max_results=5
+        )
+        
+        # Search with relative time
+        recent_articles = client.search(
+            "climate change",
+            when="24h",  # Last 24 hours
+            max_results=5
+        )
+        
+        # Batch search multiple queries
+        batch_results = client.batch_search(
+            queries=["AI", "machine learning", "deep learning"],
+            when="7d",  # Last 7 days
+            max_results=3
+        )
+        
+        # Process results
+        for topic, articles in batch_results.items():
+            print(f"\nTop {topic} news:")
+            for article in articles:
+                print(f"- {article['title']} ({article['source']})")
+                print(f"  Published: {article['published']}")
+                print(f"  Summary: {article['summary'][:100]}...")
 
 except Exception as e:
     print(f"An error occurred: {e}")
-finally:
-    # Clean up resources
-    del client
 ```
 
 ### Asynchronous Client
@@ -281,7 +276,7 @@ except Exception as e:
 
 ### Resource Management
 - Use context managers (`async with`) for async clients
-- Explicitly close synchronous clients when done
+- Use context managers (`with`) or call `close()` for synchronous clients
 - Implement proper error handling and cleanup
 
 ### Performance Optimization
