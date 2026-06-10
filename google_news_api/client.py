@@ -11,7 +11,9 @@ import json
 import logging
 import platform
 import random
+import re
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import quote, urlencode, urlparse
 
@@ -131,8 +133,20 @@ class BaseGoogleNewsClient(ABC):
 
     @staticmethod
     def _validate_language(language: str) -> None:
+        if not isinstance(language, str):
+            raise ConfigurationError(
+                "Language must be a two-letter ISO 639-1 "
+                "code or language-COUNTRY format",
+                field="language",
+                value=language,
+            )
+
         parts = language.split("-")
-        if len(parts) > 2 or len(parts[0]) != 2:
+        if (
+            len(parts) > 2
+            or len(parts[0]) != 2
+            or (len(parts) == 2 and len(parts[1]) != 2)
+        ):
             raise ConfigurationError(
                 "Language must be a two-letter ISO 639-1 "
                 "code or language-COUNTRY format",
@@ -168,11 +182,17 @@ class BaseGoogleNewsClient(ABC):
         Raises:
             ValidationError: If date format is invalid
         """
-        import re
-
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
             raise ValidationError(
                 f"{param_name} must be in YYYY-MM-DD format",
+                field=param_name,
+                value=date,
+            )
+        try:
+            datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            raise ValidationError(
+                f"{param_name} must be a valid date in YYYY-MM-DD format",
                 field=param_name,
                 value=date,
             )
@@ -188,8 +208,6 @@ class BaseGoogleNewsClient(ABC):
         Raises:
             ValidationError: If time range format is invalid
         """
-        import re
-
         if not re.match(r"^\d+[hd]$", when):
             raise ValidationError(
                 "Time range must be in format: <number>[h|d] "
@@ -340,7 +358,19 @@ class GoogleNewsClient(BaseGoogleNewsClient):
     def __del__(self) -> None:
         """Clean up resources."""
         if hasattr(self, "_client"):
-            self._client.close()
+            self.close()
+
+    def __enter__(self) -> "GoogleNewsClient":
+        """Enter the context manager."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit the context manager."""
+        self.close()
+
+    def close(self) -> None:
+        """Close the underlying HTTP client."""
+        self._client.close()
 
     @retry_sync(exceptions=(HTTPError, RateLimitError), max_retries=3, backoff=2.0)
     def _fetch_feed(self, url: str) -> FeedParserDict:
