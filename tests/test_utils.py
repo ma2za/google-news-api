@@ -2,6 +2,7 @@
 
 import asyncio
 import time
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -24,7 +25,7 @@ def test_sync_cache():
     assert cache.get("key1") == "value1"
 
     # Test TTL
-    time.sleep(1.1)  # Wait for TTL to expire
+    cache.cache["key1"] = ("value1", datetime.now() - timedelta(seconds=1))
     assert cache.get("key1") is None
 
     # Test overwriting
@@ -43,7 +44,8 @@ async def test_async_cache():
     assert await cache.get("key1") == "value1"
 
     # Test TTL
-    await asyncio.sleep(1.1)  # Wait for TTL to expire
+    async with cache.lock:
+        cache.cache["key1"] = ("value1", datetime.now() - timedelta(seconds=1))
     assert await cache.get("key1") is None
 
     # Test overwriting

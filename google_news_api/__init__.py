@@ -1,5 +1,7 @@
 """Google News API package."""
 
+from importlib.metadata import PackageNotFoundError, version
+
 from .client import AsyncGoogleNewsClient, GoogleNewsClient
 from .config import ClientConfig
 from .exceptions import (
@@ -13,7 +15,11 @@ from .exceptions import (
 from .logging import setup_logging
 from .utils import AsyncCache, AsyncRateLimiter, Cache, RateLimiter
 
-__version__ = "0.0.9"
+try:
+    __version__ = version("google-news-api")
+except PackageNotFoundError:
+    __version__ = "0.0.0"
+
 __author__ = "Paolo Mazza"
 __email__ = "mazzapaolo2019@gmail.com"
 

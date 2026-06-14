@@ -12,6 +12,7 @@ import logging
 import platform
 import random
 import re
+import time
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -569,6 +570,175 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         url = self._build_url(path)
         feed = self._fetch_feed(url)
         return self._parse_articles(feed, max_results)
+
+    def decode_url(self, source_url: str, timeout: float = 30.0) -> str:
+        """Decode a Google News article URL into its original source URL."""
+        try:
+            url = urlparse(source_url)
+            if not url.netloc.endswith("news.google.com"):
+                raise ValidationError(
+                    "URL must be a Google News article URL",
+                    field="source_url",
+                    value=source_url,
+                )
+
+            path = url.path.split("/")
+            if len(path) < 4 or path[1] != "rss" or path[2] != "articles":
+                raise ValidationError(
+                    "Invalid Google News URL format",
+                    field="source_url",
+                    value=source_url,
+                )
+
+            base64_str = path[-1]
+            url = f"{self.BASE_URL}articles/{base64_str}"
+
+            with self._rate_limiter:
+                response = self._client.get(
+                    url,
+                    params={
+                        "hl": self.language_full,
+                        "gl": self.country,
+                        "ceid": f"{self.country}:{self.language_base}",
+                    },
+                    headers={
+                        "User-Agent": "python-requests/2.32.3",
+                        "Accept-Encoding": "gzip, deflate",
+                        "Accept": "*/*",
+                        "Connection": "keep-alive",
+                    },
+                    timeout=timeout,
+                )
+
+                if response.status_code == 429:
+                    retry_after = float(response.headers.get("Retry-After", 60))
+                    raise RateLimitError(
+                        "Rate limit exceeded",
+                        retry_after=retry_after,
+                        response=response,
+                    )
+
+                if not (200 <= response.status_code < 400):
+                    raise HTTPError(
+                        f"HTTP {response.status_code}: {response.reason_phrase}",
+                        status_code=response.status_code,
+                        response_text=response.text,
+                    )
+
+                parser = HTMLParser(response.text)
+                data_element = parser.css_first("c-wiz > div[jscontroller]")
+                if not data_element:
+                    raise ParsingError(
+                        "Could not find required data element in response",
+                        data=response.text,
+                    )
+
+                signature = data_element.attributes.get("data-n-a-sg")
+                timestamp = data_element.attributes.get("data-n-a-ts")
+                if not signature or not timestamp:
+                    raise ParsingError(
+                        "Missing required attributes in response",
+                        data=response.text,
+                    )
+
+                url = "https://news.google.com/_/DotsSplashUi/data/batchexecute"
+                payload = [
+                    "Fbv4je",
+                    (
+                        "["
+                        '"garturlreq",'
+                        "["
+                        '["X","X",["X","X"],null,null,1,1,'
+                        f'"{self.country}:{self.language_base}",'
+                        "null,1,null,null,null,null,null,0,1],"
+                        '"X","X",1,[1,1,1],1,1,null,0,0,null,0],'
+                        f'"{base64_str}",{timestamp},"{signature}"'
+                        "]"
+                    ),
+                ]
+
+                response = self._client.post(
+                    url,
+                    headers={
+                        "Content-Type": (
+                            "application/x-www-form-urlencoded;charset=UTF-8"
+                        ),
+                    },
+                    content=f"f.req={quote(json.dumps([[payload]]))}",
+                    timeout=timeout,
+                )
+
+                if not (200 <= response.status_code < 400):
+                    raise HTTPError(
+                        f"HTTP {response.status_code}: {response.reason_phrase}",
+                        status_code=response.status_code,
+                        response_text=response.text,
+                    )
+
+                try:
+                    parsed_data = json.loads(response.text.split("\n\n")[1])[:-2]
+                    decoded_url = json.loads(parsed_data[0][2])[1]
+                    return decoded_url
+                except (json.JSONDecodeError, IndexError, KeyError) as e:
+                    raise ParsingError(
+                        "Failed to parse decoded URL from response",
+                        data=response.text,
+                        error=e,
+                    )
+
+        except Exception as e:
+            if isinstance(
+                e, (ValidationError, HTTPError, ParsingError, RateLimitError)
+            ):
+                raise
+            logger.error(f"Error decoding Google News URL {source_url}: {e}")
+            return source_url
+
+    def decode_urls(
+        self,
+        urls: List[str],
+        *,
+        timeout: float = 30.0,
+        delay: float = 1.0,
+        show_progress: bool = False,
+    ) -> List[Optional[str]]:
+        """Decode multiple Google News URLs."""
+        if not urls:
+            return []
+
+        if not isinstance(urls, list):
+            raise ValidationError(
+                "urls must be a list of strings",
+                field="urls",
+                value=urls,
+            )
+
+        pbar = (
+            tqdm(total=len(urls), desc="Decoding Google News URLs")
+            if show_progress
+            else None
+        )
+        results = []
+
+        try:
+            for url in urls:
+                try:
+                    time.sleep(delay)
+                    results.append(self.decode_url(url, timeout))
+                except (ValidationError, HTTPError, ParsingError, RateLimitError) as e:
+                    logger.warning(f"Failed to decode URL {url}: {str(e)}")
+                    results.append(None)
+                except Exception as e:
+                    logger.error(f"Unexpected error decoding URL {url}: {e}")
+                    results.append(None)
+                finally:
+                    if pbar is not None:
+                        pbar.update(1)
+
+            return results
+        finally:
+            if pbar is not None:
+                pbar.close()
 
 
 class AsyncGoogleNewsClient(BaseGoogleNewsClient):
