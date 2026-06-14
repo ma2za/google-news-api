@@ -7,7 +7,6 @@ import time
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, Optional, TypeVar, cast
 
-from .exceptions import RateLimitError
 from .logging import logger
 
 T = TypeVar("T")
@@ -35,34 +34,31 @@ class RateLimiter:
         self.lock = threading.Lock()
 
     def __enter__(self) -> None:
-        """Acquire a token, waiting if necessary.
+        """Acquire a token, waiting if necessary."""
+        while True:
+            with self.lock:
+                now = time.monotonic()
+                time_passed = now - self.last_update
+                self.tokens = min(
+                    self.requests_per_minute,
+                    self.tokens + time_passed * (self.requests_per_minute / 60.0),
+                )
+                self.last_update = now
 
-        Raises:
-            RateLimitError: If rate limit is exceeded
-        """
-        with self.lock:
-            now = time.monotonic()
-            time_passed = now - self.last_update
-            self.tokens = min(
-                self.requests_per_minute,
-                self.tokens + time_passed * (self.requests_per_minute / 60.0),
-            )
-            self.last_update = now
+                if self.tokens >= 1:
+                    self.tokens -= 1
+                    return
 
-            if self.tokens < 1:
                 wait_time = (1 - self.tokens) * (60.0 / self.requests_per_minute)
                 logger.warning(
-                    "Rate limit reached",
+                    "Rate limit reached, waiting",
                     extra={
                         "wait_time": wait_time,
                         "requests_per_minute": self.requests_per_minute,
                     },
                 )
-                raise RateLimitError(
-                    f"Rate limit exceeded. Try again in {wait_time:.2f} seconds",
-                )
 
-            self.tokens -= 1
+            time.sleep(wait_time)
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit the context manager."""
@@ -90,34 +86,31 @@ class AsyncRateLimiter:
         self.lock = asyncio.Lock()
 
     async def __aenter__(self) -> None:
-        """Acquire a token, waiting if necessary.
+        """Acquire a token, waiting if necessary."""
+        while True:
+            async with self.lock:
+                now = time.monotonic()
+                time_passed = now - self.last_update
+                self.tokens = min(
+                    self.requests_per_minute,
+                    self.tokens + time_passed * (self.requests_per_minute / 60.0),
+                )
+                self.last_update = now
 
-        Raises:
-            RateLimitError: If rate limit is exceeded
-        """
-        async with self.lock:
-            now = time.monotonic()
-            time_passed = now - self.last_update
-            self.tokens = min(
-                self.requests_per_minute,
-                self.tokens + time_passed * (self.requests_per_minute / 60.0),
-            )
-            self.last_update = now
+                if self.tokens >= 1:
+                    self.tokens -= 1
+                    return
 
-            if self.tokens < 1:
                 wait_time = (1 - self.tokens) * (60.0 / self.requests_per_minute)
                 logger.warning(
-                    "Rate limit reached",
+                    "Rate limit reached, waiting",
                     extra={
                         "wait_time": wait_time,
                         "requests_per_minute": self.requests_per_minute,
                     },
                 )
-                raise RateLimitError(
-                    f"Rate limit exceeded. Try again in {wait_time:.2f} seconds",
-                )
 
-            self.tokens -= 1
+            await asyncio.sleep(wait_time)
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit the context manager."""

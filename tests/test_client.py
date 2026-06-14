@@ -520,18 +520,9 @@ async def test_rate_limiter_logging():
     try:
         setup_logging(level="WARNING", structured=True, log_file=tmp_name)
 
-        # Create rate limiter with very low limit
-        limiter = AsyncRateLimiter(requests_per_minute=1)
-
-        # First request should work
+        limiter = AsyncRateLimiter(requests_per_minute=6000)
+        limiter.tokens = 0
         async with limiter:
-            pass
-
-        # Second immediate request should fail and log warning
-        try:
-            async with limiter:
-                pytest.fail("Should have raised RateLimitError")
-        except RateLimitError:
             pass
 
         # Check log file
@@ -540,7 +531,7 @@ async def test_rate_limiter_logging():
 
         log_data = json.loads(log_line)
         assert log_data["level"] == "WARNING"
-        assert "Rate limit reached" in log_data["message"]
+        assert "Rate limit reached, waiting" in log_data["message"]
     finally:
         # Remove all handlers to release file
         logger.handlers = []
