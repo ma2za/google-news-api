@@ -38,9 +38,11 @@ Parameters:
 Both tools return a list of article dictionaries containing:
 - `title`: Article title
 - `link`: Direct article URL (decoded from Google redirect URL)
-- `google_link`: Original Google News URL
-- `published_date`: Article publication date
+- `google_link`: Original Google News URL when URL decoding succeeds
+- `published`: Article publication date
 - `summary`: Article summary
+- `source`: News source name
+- `text`: Extracted article text when URL decoding and extraction succeed
 
 ## Error Handling
 If an error occurs, the response will contain a single dictionary with an "error" key describing the issue.
@@ -75,5 +77,5 @@ result = await client.top_news(
 ## Running the Server
 The server runs using stdio transport:
 ```python
-python googlenews.py
+python mcp_server/googlenews.py
 ```

@@ -1,18 +1,38 @@
 [project]
 name = "google-news-api"
 version = "0.0.9"
-description = ""
+description = "A synchronous and asynchronous Python client for Google News RSS feeds."
 authors = [
     {name = "Paolo Mazza",email = "mazzapaolo2019@gmail.com"}
 ]
 readme = "README.md"
+license = {file = "LICENSE"}
 requires-python = ">=3.9"
+keywords = ["google-news", "rss", "news", "async", "httpx"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "httpx (>=0.28.1,<0.29.0)",
     "feedparser (>=6.0.11,<7.0.0)",
     "selectolax (>=0.3.29,<0.4.0)",
     "tqdm (>=4.67.1,<5.0.0)",
 ]
+
+[project.urls]
+Homepage = "https://github.com/ma2za/google-news-api"
+Repository = "https://github.com/ma2za/google-news-api"
+Issues = "https://github.com/ma2za/google-news-api/issues"
 
 
 [build-system]

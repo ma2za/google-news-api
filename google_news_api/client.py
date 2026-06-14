@@ -714,6 +714,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         max_concurrent: int = 5,
         timeout: float = 30.0,
         delay: float = 1.0,
+        show_progress: bool = False,
         mode: str = DEFAULT_MODE,
     ) -> Dict[str, List[Dict[str, Any]]]:
         """Perform multiple searches in batch asynchronously.
@@ -727,6 +728,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
             max_concurrent: Maximum number of concurrent requests
             timeout: Timeout in seconds for each request
             delay: Delay in seconds between requests to avoid rate limiting
+            show_progress: Whether to show a progress bar
             mode: Search backend. One of "default", "searchapi_light",
                 or "searchapi_portal"
 
@@ -739,7 +741,6 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
             (e.g. "12h" for last 12 hours)
             - after/before and when parameters are mutually exclusive
             - Searches are performed concurrently for better performance
-            - Shows a progress bar during searching
         """
         if not queries:
             return {}
@@ -767,7 +768,11 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
             if before is not None:
                 self._validate_date(before, "before")
 
-        pbar = tqdm(total=len(queries), desc="Searching news articles")
+        pbar = (
+            tqdm(total=len(queries), desc="Searching news articles")
+            if show_progress
+            else None
+        )
         semaphore = asyncio.Semaphore(max_concurrent)
 
         async def _search_with_progress(
@@ -784,11 +789,13 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
                         max_results=max_results,
                         mode=mode,
                     )
-                    pbar.update(1)
+                    if pbar is not None:
+                        pbar.update(1)
                     return query, results
             except ValidationError as e:
                 logger.error(f"Error searching for query '{query}': {str(e)}")
-                pbar.update(1)
+                if pbar is not None:
+                    pbar.update(1)
                 return query, []
 
         try:
@@ -799,7 +806,8 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
             # Convert results list to dictionary
             return dict(results_list)
         finally:
-            pbar.close()
+            if pbar is not None:
+                pbar.close()
 
     async def top_news(
         self,
@@ -966,7 +974,8 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         max_concurrent: int = 5,
         timeout: float = 30.0,
         delay: float = 1.0,
-    ) -> List[str]:
+        show_progress: bool = False,
+    ) -> List[Optional[str]]:
         """Decode multiple Google News URLs in parallel.
 
         Args:
@@ -974,6 +983,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
             max_concurrent: Maximum number of concurrent requests
             timeout: Timeout in seconds for each request
             delay: Delay in seconds between requests to avoid rate limiting
+            show_progress: Whether to show a progress bar
 
         Returns:
             List of decoded URLs in the same order as input.
@@ -982,7 +992,6 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         Note:
             - Invalid URLs will return None
             - Uses rate limiting to avoid overwhelming the server
-            - Shows a progress bar during decoding
         """
         if not urls:
             return []
@@ -994,7 +1003,11 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
                 value=urls,
             )
 
-        pbar = tqdm(total=len(urls), desc="Decoding Google News URLs")
+        pbar = (
+            tqdm(total=len(urls), desc="Decoding Google News URLs")
+            if show_progress
+            else None
+        )
         semaphore = asyncio.Semaphore(max_concurrent)
 
         async def decode_with_progress(url: str) -> Optional[str]:
@@ -1002,19 +1015,23 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
                 async with semaphore:
                     await asyncio.sleep(delay)
                     result = await self.decode_url(url, timeout)
-                    pbar.update(1)
+                    if pbar is not None:
+                        pbar.update(1)
                     return result
             except (ValidationError, HTTPError, ParsingError, RateLimitError) as e:
                 logger.warning(f"Failed to decode URL {url}: {str(e)}")
-                pbar.update(1)
+                if pbar is not None:
+                    pbar.update(1)
                 return None
             except Exception as e:
                 logger.error(f"Unexpected error decoding URL {url}: {e}")
-                pbar.update(1)
+                if pbar is not None:
+                    pbar.update(1)
                 return None
 
         try:
             results = await asyncio.gather(*[decode_with_progress(url) for url in urls])
             return results
         finally:
-            pbar.close()
+            if pbar is not None:
+                pbar.close()

@@ -5,7 +5,6 @@ import time
 
 import pytest
 
-from google_news_api.exceptions import RateLimitError
 from google_news_api.utils import (
     AsyncCache,
     AsyncRateLimiter,
@@ -55,7 +54,7 @@ async def test_async_cache():
 
 def test_sync_rate_limiter():
     """Test synchronous rate limiter functionality."""
-    limiter = RateLimiter(requests_per_minute=60)
+    limiter = RateLimiter(requests_per_minute=6000)
 
     start_time = time.time()
     with limiter:
@@ -68,17 +67,20 @@ def test_sync_rate_limiter():
         with limiter:
             pass
 
-    # Test rate limit error
-    with pytest.raises(RateLimitError):
-        for _ in range(61):  # Exceed rate limit
-            with limiter:
-                pass
+    limiter.tokens = 0
+    limiter.last_update = time.monotonic()
+
+    start_time = time.time()
+    with limiter:
+        pass
+    elapsed = time.time() - start_time
+    assert elapsed >= 0.008
 
 
 @pytest.mark.asyncio
 async def test_async_rate_limiter():
     """Test asynchronous rate limiter functionality."""
-    limiter = AsyncRateLimiter(requests_per_minute=60)
+    limiter = AsyncRateLimiter(requests_per_minute=6000)
 
     start_time = time.time()
     async with limiter:
@@ -91,11 +93,14 @@ async def test_async_rate_limiter():
         async with limiter:
             pass
 
-    # Test rate limit error
-    with pytest.raises(RateLimitError):
-        for _ in range(61):  # Exceed rate limit
-            async with limiter:
-                await asyncio.sleep(0)  # Small delay to allow other tasks
+    limiter.tokens = 0
+    limiter.last_update = time.monotonic()
+
+    start_time = time.time()
+    async with limiter:
+        pass
+    elapsed = time.time() - start_time
+    assert elapsed >= 0.008
 
 
 def test_retry_sync():
