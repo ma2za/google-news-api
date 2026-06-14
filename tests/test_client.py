@@ -601,8 +601,6 @@ def test_chrome_headers():
 
 def test_cache_operations():
     """Test cache operations in detail."""
-    import time
-
     from google_news_api.utils import Cache
 
     # Test initialization with invalid TTL
@@ -617,7 +615,7 @@ def test_cache_operations():
     assert cache.get("key1") == "value1"
 
     # Test expiration
-    time.sleep(1.1)  # Wait for TTL to expire
+    cache.cache["key1"] = ("value1", datetime.now() - timedelta(seconds=1))
     assert cache.get("key1") is None
 
     # Test clear
@@ -629,8 +627,6 @@ def test_cache_operations():
 @pytest.mark.asyncio
 async def test_async_cache_operations():
     """Test async cache operations."""
-    import asyncio
-
     from google_news_api.utils import AsyncCache
 
     # Test initialization with invalid TTL
@@ -645,7 +641,8 @@ async def test_async_cache_operations():
     assert await cache.get("key1") == "value1"
 
     # Test expiration
-    await asyncio.sleep(1.1)  # Wait for TTL to expire
+    async with cache.lock:
+        cache.cache["key1"] = ("value1", datetime.now() - timedelta(seconds=1))
     assert await cache.get("key1") is None
 
     # Test clear
@@ -777,6 +774,73 @@ def test_client_error_handling():
             )
             client.search("test")
     assert "Request failed" in str(exc_info.value)
+
+
+def test_sync_decode_url(monkeypatch):
+    """Test synchronous Google News URL decoding with mocked responses."""
+    import httpx
+
+    client = GoogleNewsClient()
+    google_news_url = "https://news.google.com/rss/articles/test-article-id"
+    decoded_url = "https://example.com/article"
+    html = '<c-wiz><div jscontroller data-n-a-sg="sig" data-n-a-ts="123"></div></c-wiz>'
+    batch_data = [[None, None, json.dumps([None, decoded_url])], None, None]
+
+    def mock_get(url, **kwargs):
+        assert url == "https://news.google.com/rss/articles/test-article-id"
+        return httpx.Response(
+            200,
+            text=html,
+            request=httpx.Request("GET", url),
+        )
+
+    def mock_post(url, **kwargs):
+        assert url == "https://news.google.com/_/DotsSplashUi/data/batchexecute"
+        return httpx.Response(
+            200,
+            text=f")]}}'\n\n{json.dumps(batch_data)}",
+            request=httpx.Request("POST", url),
+        )
+
+    monkeypatch.setattr(client._client, "get", mock_get)
+    monkeypatch.setattr(client._client, "post", mock_post)
+
+    assert client.decode_url(google_news_url) == decoded_url
+
+
+def test_sync_decode_url_validation():
+    """Test synchronous URL decoding validation."""
+    client = GoogleNewsClient()
+
+    with pytest.raises(ValidationError) as exc_info:
+        client.decode_url("not-a-valid-url")
+    assert "URL must be a Google News article URL" in str(exc_info.value)
+
+    with pytest.raises(ValidationError) as exc_info:
+        client.decode_url("https://news.google.com/invalid")
+    assert "Invalid Google News URL format" in str(exc_info.value)
+
+
+def test_sync_decode_urls(monkeypatch):
+    """Test synchronous batch URL decoding error handling."""
+    client = GoogleNewsClient()
+
+    def mock_decode_url(url, timeout=30.0):
+        if url == "bad":
+            raise ValidationError("bad url")
+        return f"decoded:{url}"
+
+    monkeypatch.setattr(client, "decode_url", mock_decode_url)
+
+    assert client.decode_urls(["a", "bad", "c"], delay=0) == [
+        "decoded:a",
+        None,
+        "decoded:c",
+    ]
+
+    with pytest.raises(ValidationError) as exc_info:
+        client.decode_urls("not-a-list")
+    assert "urls must be a list of strings" in str(exc_info.value)
 
 
 @pytest.mark.asyncio

@@ -96,6 +96,5 @@ exclude_lines = [
 [tool.uv.workspace]
 members = [
     "mcp_server",
-    "mcp-client",
 ]
 

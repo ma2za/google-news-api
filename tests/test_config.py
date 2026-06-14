@@ -73,6 +73,22 @@ def test_log_config():
     assert config.log_config.format == "%(message)s"
 
 
+def test_client_config_does_not_setup_logging(monkeypatch):
+    """ClientConfig should not mutate process logging on construction."""
+    called = False
+
+    def setup(self):
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(LogConfig, "setup", setup)
+
+    config = ClientConfig()
+
+    assert config.log_config is not None
+    assert called is False
+
+
 def test_config_as_dict():
     """Test configuration to dictionary conversion."""
     config = ClientConfig(language="fr", country="FR")

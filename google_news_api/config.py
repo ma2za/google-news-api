@@ -105,10 +105,8 @@ class ClientConfig:
         if self.cache_ttl <= 0:
             raise ValueError("cache_ttl must be positive")
 
-        # Set up logging if config provided
         if self.log_config is None:
             self.log_config = LogConfig()
-        self.log_config.setup()
 
     def as_dict(self) -> Dict[str, str]:
         """Convert configuration to dictionary.
