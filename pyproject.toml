@@ -1,6 +1,6 @@
 [project]
 name = "google-news-api"
-version = "0.0.9"
+version = "0.0.10"
 description = "A synchronous and asynchronous Python client for Google News RSS feeds."
 authors = [
     {name = "Paolo Mazza",email = "mazzapaolo2019@gmail.com"}
