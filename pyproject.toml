@@ -1,14 +1,25 @@
 [project]
 name = "google-news-api"
 version = "0.0.10"
-description = "A synchronous and asynchronous Python client for Google News RSS feeds."
+description = "Unofficial Python client for Google News RSS with sync, async, URL decoding, caching, and MCP support."
 authors = [
     {name = "Paolo Mazza",email = "mazzapaolo2019@gmail.com"}
 ]
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.9"
-keywords = ["google-news", "rss", "news", "async", "httpx"]
+keywords = [
+    "google-news",
+    "google-news-api",
+    "google-news-rss",
+    "news-api",
+    "rss",
+    "rss-client",
+    "python-news",
+    "async",
+    "httpx",
+    "mcp",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -77,6 +88,9 @@ sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 addopts = "--cov=google_news_api --cov-report=term-missing --cov-report=html"
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "integration: tests that make live network calls",
+]
 
 [tool.coverage.run]
 branch = true

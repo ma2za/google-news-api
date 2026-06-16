@@ -1,39 +1,83 @@
-# Google News API Client
+# Google News API Client for Python
 
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/google-news-api?period=monthly&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads%2Fmonth)](https://pepy.tech/projects/google-news-api)
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
 [![PyPI Version](https://img.shields.io/pypi/v/google-news-api)](https://pypi.org/project/google-news-api/)
 
-A robust Python client library for the Google News RSS feed API that provides both synchronous and asynchronous implementations with built-in rate limiting, caching, and error handling.
+Unofficial Google News API client for Python. Search Google News RSS feeds,
+fetch top stories, filter by date or recency, decode Google News article URLs,
+and use the same news tools from an MCP server.
+
+This package uses Google News RSS feeds and compatible provider modes. It is not
+an official Google API.
+
+## Quickstart
+
+```bash
+pip install google-news-api
+```
+
+```python
+from google_news_api import GoogleNewsClient
+
+with GoogleNewsClient(language="en", country="US") as client:
+    articles = client.search("artificial intelligence", when="24h", max_results=5)
+
+for article in articles:
+    print(article["title"])
+    print(article["source"])
+    print(article["link"])
+```
+
+Each article contains:
+
+```python
+{
+    "title": "Article title",
+    "link": "https://news.google.com/rss/articles/...",
+    "published": "Tue, 16 Jun 2026 12:00:00 GMT",
+    "summary": "Article summary",
+    "source": "Publisher name",
+}
+```
+
+## Why Use This Package
+
+- Sync and async clients with the same API shape
+- Google News RSS search, topic feeds, date filters, and relative time filters
+- Google News URL decoding to original publisher URLs
+- Rate limiting, retries, and in-memory caching
+- Optional SearchAPI provider modes for direct publisher URLs and richer snippets
+- MCP server for agents and AI tools
 
 ## Features
 
-- ✨ Comprehensive news search and retrieval functionality
+- Comprehensive news search and retrieval functionality
   - Search by keywords with advanced filtering
   - Get top news by topic (WORLD, NATION, BUSINESS, TECHNOLOGY, etc.)
   - Batch search support for multiple queries
   - URL decoding for original article sources
-- 🔄 Both synchronous and asynchronous APIs
+- Both synchronous and asynchronous APIs
   - `GoogleNewsClient` for synchronous operations
   - `AsyncGoogleNewsClient` for async/await support
-- 🕒 Advanced time-based search capabilities
+- Advanced time-based search capabilities
   - Date range filtering (after/before)
   - Relative time filtering (e.g., "1h", "24h", "7d")
   - Maximum 100 results for date-based searches
-- 🚀 High performance features
+- High performance features
   - In-memory caching with configurable TTL
   - Built-in rate limiting with token bucket algorithm
   - Automatic retries with exponential backoff
   - Concurrent batch searches in async mode
-- 🌍 Multi-language and country support
+- Multi-language and country support
   - ISO 639-1 language codes (e.g., "en", "fr", "de")
   - ISO 3166-1 country codes (e.g., "US", "GB", "DE")
   - Language-country combinations (e.g., "en-US", "fr-FR")
-- 🛡️ Robust error handling
+- Robust error handling
   - Specific exceptions for different error scenarios
   - Detailed error messages with context
   - Graceful fallbacks and retries
-- 📦 Modern Python packaging with Poetry
+- Modern Python packaging with Poetry
 
 ## Requirements
 
@@ -198,6 +242,19 @@ light_articles = client.search(
 In practice, use `"default"` first. Switch to `"searchapi_portal"` for direct
 publisher URLs, or `"searchapi_light"` for snippet-heavy recent searches.
 
+## MCP Server
+
+This repository also includes an MCP server for agent workflows. It exposes
+Google News search and top-news tools, decodes Google News URLs, and can extract
+article text from publisher pages.
+
+```bash
+python mcp_server/googlenews.py
+```
+
+See [mcp_server/README.md](mcp_server/README.md) for tool parameters and response
+format.
+
 ## Configuration
 
 The library provides extensive configuration options through the client initialization:
@@ -312,12 +369,18 @@ pre-commit install
 # Run tests with Poetry
 poetry run pytest
 
+# Include live Google News integration tests
+poetry run pytest --run-integration
+
 # Run tests with coverage
 poetry run pytest --cov=google_news_api
 
 # Run pre-commit on all files
 pre-commit run --all-files
 ```
+
+The default test command skips tests that make live network calls. CI runs this
+stable test set on supported Python versions.
 
 ## Contributing
 
