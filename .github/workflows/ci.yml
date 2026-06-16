@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.10"
+          - "3.11"
+          - "3.12"
+          - "3.13"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        run: python -m pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --with dev
+
+      - name: Lint
+        run: |
+          poetry run black --check google_news_api tests examples mcp_server
+          poetry run isort --check-only google_news_api tests examples mcp_server
+          poetry run flake8 google_news_api tests examples mcp_server
+
+      - name: Test
+        run: poetry run pytest
