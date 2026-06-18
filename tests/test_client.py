@@ -14,7 +14,6 @@ from google_news_api.exceptions import (
     ConfigurationError,
     HTTPError,
     ParsingError,
-    RateLimitError,
     ValidationError,
 )
 from google_news_api.logging import setup_logging

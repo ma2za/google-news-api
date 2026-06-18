@@ -1,6 +1,5 @@
 """Tests for the utility functions and classes."""
 
-import asyncio
 import time
 from datetime import datetime, timedelta
 
