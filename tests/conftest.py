@@ -1,6 +1,5 @@
 import pytest
 
-
 INTEGRATION_TESTS = {
     "test_get_top_news",
     "test_get_topic_news",
