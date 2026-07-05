@@ -244,9 +244,53 @@ publisher URLs, or `"searchapi_light"` for snippet-heavy recent searches.
 
 ## MCP Server
 
-This repository also includes an MCP server for agent workflows. It exposes
-Google News search and top-news tools, decodes Google News URLs, and can extract
-article text from publisher pages.
+On Python 3.10 or newer, install the optional MCP dependencies to use Google
+News from agent workflows:
+
+```bash
+pip install "google-news-api[mcp]"
+```
+
+Then run the packaged stdio server:
+
+```bash
+google-news-mcp
+```
+
+The MCP server exposes `news_search` and `top_news`. By default, it preserves the
+existing enriched response behavior: Google News links are decoded to publisher
+URLs, the original URL is stored in `google_link`, and article text is extracted
+when possible.
+
+For faster headline-only agent calls, disable enrichment:
+
+```python
+result = await client.news_search(
+    query="artificial intelligence",
+    when="24h",
+    max_results=10,
+    decode_links=False,
+    extract_text=False,
+)
+```
+
+MCP tools also accept the same search modes as the Python client. SearchAPI modes
+require an API key:
+
+```bash
+export SEARCHAPI_API_KEY="your-api-key"
+```
+
+```python
+result = await client.news_search(
+    query="artificial intelligence regulation",
+    max_results=10,
+    mode="searchapi_light",
+)
+```
+
+For local development from the source tree, this compatibility entry point still
+works:
 
 ```bash
 python mcp_server/googlenews.py

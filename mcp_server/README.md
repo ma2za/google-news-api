@@ -52,6 +52,7 @@ The server includes built-in configurations for:
 - Rate limiting: 60 requests per minute
 - Cache TTL: 300 seconds (5 minutes)
 - URL decoding: 5 concurrent requests maximum with 1-second delay
+- Enrichment defaults: `decode_links=True` and `extract_text=True`
 
 ## Usage Example
 ```python
@@ -60,13 +61,16 @@ result = await client.news_search(
     query="artificial intelligence",
     when="7d",
     language="en",
-    country="US"
+    country="US",
+    decode_links=False,
+    extract_text=False,
 )
 
 # Example MCP client call for top news
 result = await client.top_news(
     topic="TECHNOLOGY",
-    max_results=10
+    max_results=10,
+    mode="searchapi_light",
 )
 ```
 
@@ -75,7 +79,16 @@ result = await client.top_news(
 - AsyncGoogleNewsClient
 
 ## Running the Server
-The server runs using stdio transport:
+On Python 3.10 or newer, install the package with MCP dependencies and run the
+packaged stdio server:
+
+```bash
+pip install "google-news-api[mcp]"
+google-news-mcp
+```
+
+The source-tree compatibility wrapper still works for local development:
+
 ```python
 python mcp_server/googlenews.py
 ```
