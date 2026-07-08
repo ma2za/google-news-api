@@ -38,6 +38,7 @@ Each article contains:
     "published": "Tue, 16 Jun 2026 12:00:00 GMT",
     "summary": "Article summary",
     "source": "Publisher name",
+    "id": "Google News article ID",
 }
 ```
 
@@ -347,6 +348,7 @@ Each article in the results contains the following fields:
 - `published`: Publication date and time
 - `summary`: Article summary/description
 - `source`: News source name
+- `id`: Google News article ID
 
 ## Error Handling
 
