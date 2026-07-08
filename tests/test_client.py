@@ -7,6 +7,7 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 
 import dateutil.parser
+import feedparser
 import pytest
 
 from google_news_api.client import AsyncGoogleNewsClient, GoogleNewsClient
@@ -922,6 +923,70 @@ def test_parse_articles():
     assert articles[0]["published"] == "2024-01-01"
     assert articles[0]["summary"] == ""
     assert articles[0]["source"] is None
+    assert articles[0]["id"] is None
+
+
+def test_parse_articles_includes_feed_entry_id():
+    """Google News RSS guid values are exposed as article ids."""
+    client = GoogleNewsClient()
+    article_id = "CBMiTestArticleId"
+    feed = feedparser.parse(
+        f"""
+        <rss version="2.0">
+          <channel>
+            <item>
+              <title>Test</title>
+              <link>https://news.google.com/rss/articles/{article_id}?oc=5</link>
+              <pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate>
+              <guid isPermaLink="false">{article_id}</guid>
+            </item>
+          </channel>
+        </rss>
+        """
+    )
+
+    articles = client._parse_articles(feed)
+
+    assert articles[0]["id"] == article_id
+
+
+def test_parse_articles_derives_id_from_google_news_link():
+    """Fall back to the Google News link path when the feed entry has no id."""
+    from feedparser import FeedParserDict
+
+    client = GoogleNewsClient()
+    article_id = "CBMiFallbackArticleId"
+    feed = FeedParserDict()
+    entry = FeedParserDict()
+    entry.title = "Test"
+    entry.link = f"https://news.google.com/rss/articles/{article_id}?oc=5"
+    entry.published = "2024-01-01"
+    entry.summary = ""
+    feed.entries = [entry]
+
+    articles = client._parse_articles(feed)
+
+    assert articles[0]["id"] == article_id
+
+
+def test_parse_articles_normalizes_google_news_url_id():
+    """If an entry id is a Google News URL, return only its article id."""
+    from feedparser import FeedParserDict
+
+    client = GoogleNewsClient()
+    article_id = "CBMiUrlArticleId"
+    feed = FeedParserDict()
+    entry = FeedParserDict()
+    entry.title = "Test"
+    entry.link = "https://example.com/article"
+    entry.published = "2024-01-01"
+    entry.summary = ""
+    entry.id = f"https://news.google.com/rss/articles/{article_id}?oc=5"
+    feed.entries = [entry]
+
+    articles = client._parse_articles(feed)
+
+    assert articles[0]["id"] == article_id
 
 
 def test_parse_articles_negative_max_results_returns_all():
