@@ -24,6 +24,9 @@ Parameters:
 - `before`: (Optional) End date in YYYY-MM-DD format
 - `language`: Language code (default: "en")
 - `country`: Country code (default: "US")
+- `decode_links`: Whether to decode Google News URLs to publisher URLs (default: `True`)
+- `extract_text`: Whether to fetch decoded URLs and extract article text (default: `True`)
+- `mode`: Search backend: `default`, `searchapi_light`, or `searchapi_portal` (default: `default`)
 
 ### 2. top_news
 Get top news articles for a specific topic.
@@ -33,6 +36,9 @@ Parameters:
 - `max_results`: (Optional) Maximum number of results to return
 - `language`: Language code (default: "en")
 - `country`: Country code (default: "US")
+- `decode_links`: Whether to decode Google News URLs to publisher URLs (default: `True`)
+- `extract_text`: Whether to fetch decoded URLs and extract article text (default: `True`)
+- `mode`: Search backend: `default`, `searchapi_light`, or `searchapi_portal` (default: `default`)
 
 ## Response Format
 Both tools return a list of article dictionaries containing:
@@ -86,6 +92,8 @@ packaged stdio server:
 pip install "google-news-api[mcp]"
 google-news-mcp
 ```
+
+The packaged Python module is `google_news_api.mcp_server`.
 
 The source-tree compatibility wrapper still works for local development:
 

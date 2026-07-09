@@ -170,9 +170,15 @@ Run the packaged stdio server:
 google-news-mcp
 ```
 
-The MCP server exposes `news_search` and `top_news`. By default, it decodes
-Google News links to publisher URLs, stores the original URL in `google_link`,
-and extracts article text when possible.
+The packaged entrypoints are the `google-news-mcp` command and the
+`google_news_api.mcp_server` module. The source-tree
+`mcp_server/googlenews.py` script remains as a local development compatibility
+wrapper.
+
+The MCP server exposes `news_search` and `top_news`. By default, both tools
+decode Google News links to publisher URLs, store the original URL in
+`google_link`, and extract article text when possible. Both tools also accept
+`mode` for the same search modes as the Python client.
 
 For faster headline-only calls:
 

@@ -96,7 +96,7 @@ sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 
 [tool.pytest.ini_options]
 addopts = "--cov=google_news_api --cov-report=term-missing --cov-report=html"
-testpaths = ["tests"]
+testpaths = ["tests", "mcp_server/tests"]
 asyncio_mode = "auto"
 markers = [
     "integration: tests that make live network calls",

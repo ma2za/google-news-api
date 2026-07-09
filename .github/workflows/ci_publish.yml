@@ -9,7 +9,23 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Poetry
+        run: python -m pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --with dev
+
+      - name: Validate package
+        run: |
+          poetry check
+          poetry build
+
       - name: Publish python poetry package
         uses: JRubics/poetry-publish@v1.15
         with:
