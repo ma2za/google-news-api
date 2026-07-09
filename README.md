@@ -1,21 +1,24 @@
-# Google News API Client for Python
+# Google News API Python Client
 
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/google-news-api?period=monthly&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads%2Fmonth)](https://pepy.tech/projects/google-news-api)
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
 [![PyPI Version](https://img.shields.io/pypi/v/google-news-api)](https://pypi.org/project/google-news-api/)
 
-Unofficial Google News API client for Python. Search Google News RSS feeds,
-fetch top stories, filter by date or recency, decode Google News article URLs,
-and use the same news tools from an MCP server.
+Unofficial Python client for Google News RSS. Search Google News, fetch top
+stories by topic, filter by date or recency, decode Google News article URLs,
+and use the same tools from async code or an MCP server.
 
-This package uses Google News RSS feeds and compatible provider modes. It is not
-an official Google API.
+This package is not an official Google API. It uses Google News RSS feeds by
+default and offers optional SearchAPI-backed modes when you need provider URLs
+or richer snippets.
 
-## Quickstart
+## Install
 
 ```bash
 pip install google-news-api
 ```
+
+## Quickstart
 
 ```python
 from google_news_api import GoogleNewsClient
@@ -26,10 +29,26 @@ with GoogleNewsClient(language="en", country="US") as client:
 for article in articles:
     print(article["title"])
     print(article["source"])
+    print(article["published"])
     print(article["link"])
 ```
 
-Each article contains:
+## What You Get
+
+| Capability | Support |
+|------------|---------|
+| Google News search | Keyword search through Google News RSS |
+| Top stories | Topic feeds for world, nation, business, technology, sports, science, health, and entertainment |
+| Date filters | `after`, `before`, and relative `when` filters |
+| Sync and async clients | `GoogleNewsClient` and `AsyncGoogleNewsClient` |
+| URL decoding | Decode Google News RSS article links to publisher URLs |
+| Batch search | Search several queries with shared filters |
+| SearchAPI modes | Optional direct publisher URLs and richer snippets |
+| MCP server | `google-news-mcp` for agent and AI tool workflows |
+
+## Article Results
+
+Default Google News RSS results use this shape:
 
 ```python
 {
@@ -42,228 +61,120 @@ Each article contains:
 }
 ```
 
-## Why Use This Package
+Notes:
 
-- Sync and async clients with the same API shape
-- Google News RSS search, topic feeds, date filters, and relative time filters
-- Google News URL decoding to original publisher URLs
-- Rate limiting, retries, and in-memory caching
-- Optional SearchAPI provider modes for direct publisher URLs and richer snippets
-- MCP server for agents and AI tools
+- In default mode, `link` is the Google News RSS article URL.
+- In SearchAPI modes, `link` is usually the provider or publisher URL returned
+  by SearchAPI.
+- `id` is always present in normalized results. It is a Google News article ID
+  when available, and `None` when the provider does not return one.
 
-## Features
+## Common Usage
 
-- Comprehensive news search and retrieval functionality
-  - Search by keywords with advanced filtering
-  - Get top news by topic (WORLD, NATION, BUSINESS, TECHNOLOGY, etc.)
-  - Batch search support for multiple queries
-  - URL decoding for original article sources
-- Both synchronous and asynchronous APIs
-  - `GoogleNewsClient` for synchronous operations
-  - `AsyncGoogleNewsClient` for async/await support
-- Advanced time-based search capabilities
-  - Date range filtering (after/before)
-  - Relative time filtering (e.g., "1h", "24h", "7d")
-  - Maximum 100 results for date-based searches
-- High performance features
-  - In-memory caching with configurable TTL
-  - Built-in rate limiting with token bucket algorithm
-  - Automatic retries with exponential backoff
-  - Concurrent batch searches in async mode
-- Multi-language and country support
-  - ISO 639-1 language codes (e.g., "en", "fr", "de")
-  - ISO 3166-1 country codes (e.g., "US", "GB", "DE")
-  - Language-country combinations (e.g., "en-US", "fr-FR")
-- Robust error handling
-  - Specific exceptions for different error scenarios
-  - Detailed error messages with context
-  - Graceful fallbacks and retries
-- Modern Python packaging with Poetry
-
-## Requirements
-
-- Python 3.9 or higher
-- Poetry (recommended for installation)
-
-## Installation
-
-### Using Poetry (recommended)
-
-```bash
-# Install using Poetry
-poetry add google-news-api
-
-# Or clone and install from source
-git clone https://github.com/ma2za/google-news-api.git
-cd google-news-api
-poetry install
-```
-
-### Using pip
-
-```bash
-pip install google-news-api
-```
-
-## Usage Examples
-
-### Synchronous Client
+### Top News
 
 ```python
 from google_news_api import GoogleNewsClient
 
-try:
-    # Get top news by topic
-    with GoogleNewsClient(
-        language="en",
-        country="US",
-        requests_per_minute=60,
-        cache_ttl=300
-    ) as client:
-        world_news = client.top_news(topic="WORLD", max_results=5)
-        tech_news = client.top_news(topic="TECHNOLOGY", max_results=3)
-        
-        # Search with date range
-        date_articles = client.search(
-            "Ukraine war",
-            after="2024-01-01",
-            before="2024-03-01",
-            max_results=5
-        )
-        
-        # Search with relative time
-        recent_articles = client.search(
-            "climate change",
-            when="24h",  # Last 24 hours
-            max_results=5
-        )
-        
-        # Batch search multiple queries
-        batch_results = client.batch_search(
-            queries=["AI", "machine learning", "deep learning"],
-            when="7d",  # Last 7 days
-            max_results=3
-        )
-        
-        # Process results
-        for topic, articles in batch_results.items():
-            print(f"\nTop {topic} news:")
-            for article in articles:
-                print(f"- {article['title']} ({article['source']})")
-                print(f"  Published: {article['published']}")
-                print(f"  Summary: {article['summary'][:100]}...")
-
-except Exception as e:
-    print(f"An error occurred: {e}")
+with GoogleNewsClient(country="US", language="en") as client:
+    articles = client.top_news(topic="TECHNOLOGY", max_results=10)
 ```
 
-### Asynchronous Client
+### Search With Time Filters
 
 ```python
-from google_news_api import AsyncGoogleNewsClient
+with GoogleNewsClient() as client:
+    recent = client.search("climate change", when="24h", max_results=10)
+    dated = client.search(
+        "Ukraine war",
+        after="2024-01-01",
+        before="2024-03-01",
+        max_results=10,
+    )
+```
+
+Use `when` for relative time filters such as `"1h"`, `"24h"`, or `"7d"`.
+Use `after` and `before` for `YYYY-MM-DD` date range searches. `when` cannot be
+combined with `after` or `before`.
+
+### Decode Google News URLs
+
+```python
+with GoogleNewsClient() as client:
+    article = client.search("python", max_results=1)[0]
+    publisher_url = client.decode_url(article["link"])
+```
+
+### Async Client
+
+```python
 import asyncio
 
-async def main():
-    async with AsyncGoogleNewsClient(
-        language="en",
-        country="US",
-        requests_per_minute=60
-    ) as client:
-        # Fetch multiple news categories concurrently
-        world_news = await client.top_news(topic="WORLD", max_results=3)
-        tech_news = await client.top_news(topic="TECHNOLOGY", max_results=3)
-        
-        # Batch search with concurrent execution
-        batch_results = await client.batch_search(
-            queries=["AI", "machine learning", "deep learning"],
-            when="7d",
-            max_results=3
-        )
-        
-        # Decode Google News URLs to original sources
-        for topic, articles in batch_results.items():
-            print(f"\nTop {topic} news:")
-            for article in articles:
-                original_url = await client.decode_url(article['link'])
-                print(f"- {article['title']} ({article['source']})")
-                print(f"  Original URL: {original_url}")
+from google_news_api import AsyncGoogleNewsClient
 
-if __name__ == "__main__":
-    asyncio.run(main())
+
+async def main():
+    async with AsyncGoogleNewsClient() as client:
+        articles = await client.search("machine learning", when="7d", max_results=5)
+        urls = await client.decode_urls([article["link"] for article in articles])
+        return urls
+
+
+asyncio.run(main())
 ```
 
 ## Search Modes
 
-The `search()`, `batch_search()`, and `top_news()` methods support three search
-modes:
+The `search()`, `batch_search()`, and `top_news()` methods support these modes:
 
-| Mode | Backend | Best For |
+| Mode | Backend | Use When |
 |------|---------|----------|
-| `"default"` | Google News RSS | Fast baseline |
-| `"searchapi_portal"` | [SearchAPI Google News Portal](https://www.searchapi.io/docs/google-news-portal-api) | Direct publisher URLs |
-| `"searchapi_light"` | [SearchAPI Google News Light](https://www.searchapi.io/docs/google-news-light-api) | Fresh results and snippets |
+| `"default"` | Google News RSS | You want fast Google News RSS results with no API key |
+| `"searchapi_portal"` | [SearchAPI Google News Portal](https://www.searchapi.io/docs/google-news-portal-api) | You want direct publisher URLs |
+| `"searchapi_light"` | [SearchAPI Google News Light](https://www.searchapi.io/docs/google-news-light-api) | You want recent results and snippets from SearchAPI |
 
-[SearchAPI](https://www.searchapi.io/) modes require an API key:
+SearchAPI modes require an API key:
 
 ```bash
 export SEARCHAPI_API_KEY="your-api-key"
 ```
 
-Windows PowerShell:
+PowerShell:
 
 ```powershell
 $env:SEARCHAPI_API_KEY = "your-api-key"
 ```
 
-Example:
-
 ```python
-from google_news_api import GoogleNewsClient
-
-client = GoogleNewsClient(language="en", country="US")
-
-default_articles = client.search(
-    "artificial intelligence regulation",
-    max_results=10,
-)
-
-portal_articles = client.search(
-    "artificial intelligence regulation",
-    max_results=10,
-    mode="searchapi_portal",
-)
-
-light_articles = client.search(
-    "artificial intelligence regulation",
-    max_results=10,
-    mode="searchapi_light",
-)
+with GoogleNewsClient(language="en", country="US") as client:
+    articles = client.search(
+        "artificial intelligence regulation",
+        max_results=10,
+        mode="searchapi_light",
+    )
 ```
 
-In practice, use `"default"` first. Switch to `"searchapi_portal"` for direct
-publisher URLs, or `"searchapi_light"` for snippet-heavy recent searches.
+Use `"default"` first unless you specifically need SearchAPI data.
 
 ## MCP Server
 
-On Python 3.10 or newer, install the optional MCP dependencies to use Google
-News from agent workflows:
+Install optional MCP dependencies on Python 3.10 or newer:
 
 ```bash
 pip install "google-news-api[mcp]"
 ```
 
-Then run the packaged stdio server:
+Run the packaged stdio server:
 
 ```bash
 google-news-mcp
 ```
 
-The MCP server exposes `news_search` and `top_news`. By default, it preserves the
-existing enriched response behavior: Google News links are decoded to publisher
-URLs, the original URL is stored in `google_link`, and article text is extracted
-when possible.
+The MCP server exposes `news_search` and `top_news`. By default, it decodes
+Google News links to publisher URLs, stores the original URL in `google_link`,
+and extracts article text when possible.
 
-For faster headline-only agent calls, disable enrichment:
+For faster headline-only calls:
 
 ```python
 result = await client.news_search(
@@ -275,184 +186,94 @@ result = await client.news_search(
 )
 ```
 
-MCP tools also accept the same search modes as the Python client. SearchAPI modes
-require an API key:
-
-```bash
-export SEARCHAPI_API_KEY="your-api-key"
-```
-
-```python
-result = await client.news_search(
-    query="artificial intelligence regulation",
-    max_results=10,
-    mode="searchapi_light",
-)
-```
-
-For local development from the source tree, this compatibility entry point still
-works:
-
-```bash
-python mcp_server/googlenews.py
-```
-
-See [mcp_server/README.md](mcp_server/README.md) for tool parameters and response
+MCP tools accept the same search modes as the Python client. See
+[mcp_server/README.md](mcp_server/README.md) for tool parameters and response
 format.
 
 ## Configuration
 
-The library provides extensive configuration options through the client initialization:
+| Parameter | Description | Default | Examples |
+|-----------|-------------|---------|----------|
+| `language` | ISO 639-1 language code or language-country code | `"en"` | `"en"`, `"fr"`, `"en-US"` |
+| `country` | ISO 3166-1 alpha-2 country code | `"US"` | `"US"`, `"GB"`, `"DE"` |
+| `requests_per_minute` | Client-side request rate limit | `60` | `30`, `100` |
+| `cache_ttl` | In-memory cache TTL in seconds | `300` | `600`, `1800` |
 
-| Parameter | Description | Default | Example Values |
-|-----------|-------------|---------|----------------|
-| `language` | Two-letter language code (ISO 639-1) or language-country format | `"en"` | `"en"`, `"fr"`, `"de"`, `"en-US"`, `"fr-FR"` |
-| `country` | Two-letter country code (ISO 3166-1 alpha-2) | `"US"` | `"US"`, `"GB"`, `"DE"`, `"JP"` |
-| `requests_per_minute` | Rate limit threshold for API requests | `60` | `30`, `100`, `120` |
-| `cache_ttl` | Cache duration in seconds for responses | `300` | `600`, `1800`, `3600` |
+Available topics:
 
-### Available Topics
+- `"WORLD"`
+- `"NATION"`
+- `"BUSINESS"`
+- `"TECHNOLOGY"`
+- `"ENTERTAINMENT"`
+- `"SPORTS"`
+- `"SCIENCE"`
+- `"HEALTH"`
 
-The `top_news()` method supports the following topics:
-- `"WORLD"` - World news
-- `"NATION"` - National news
-- `"BUSINESS"` - Business news
-- `"TECHNOLOGY"` - Technology news
-- `"ENTERTAINMENT"` - Entertainment news
-- `"SPORTS"` - Sports news
-- `"SCIENCE"` - Science news
-- `"HEALTH"` - Health news
-
-### Time-Based Search
-
-The library supports two types of time-based search:
-
-1. **Date Range Search**
-   - Use `after` and `before` parameters
-   - Format: `YYYY-MM-DD`
-   - Maximum 100 results
-   - Example: `after="2024-01-01", before="2024-03-01"`
-
-2. **Relative Time Search**
-   - Use the `when` parameter
-   - Hours: `"1h"` to `"101h"`
-   - Days: Any number of days (e.g., `"7d"`, `"30d"`)
-   - Cannot be used with `after`/`before`
-   - Example: `when="24h"` for last 24 hours
-
-### Article Structure
-
-Each article in the results contains the following fields:
-- `title`: Article title
-- `link`: Google News article URL
-- `published`: Publication date and time
-- `summary`: Article summary/description
-- `source`: News source name
-- `id`: Google News article ID
-
-## Error Handling
-
-The library provides specific exceptions for different error scenarios:
+## Errors
 
 ```python
 from google_news_api.exceptions import (
-    ConfigurationError,  # Invalid client configuration
-    ValidationError,     # Invalid parameters
-    HTTPError,          # Network or server issues
-    RateLimitError,     # Rate limit exceeded
-    ParsingError        # RSS feed parsing errors
+    ConfigurationError,
+    HTTPError,
+    ParsingError,
+    RateLimitError,
+    ValidationError,
 )
-
-try:
-    articles = client.search("technology")
-except RateLimitError as e:
-    print(f"Rate limit exceeded. Retry after {e.retry_after} seconds")
-except HTTPError as e:
-    print(f"HTTP error {e.status_code}: {str(e)}")
-except ValidationError as e:
-    print(f"Invalid parameters: {str(e)}")
-except Exception as e:
-    print(f"Unexpected error: {str(e)}")
 ```
 
-## Best Practices
-
-### Resource Management
-- Use context managers (`async with`) for async clients
-- Use context managers (`with`) or call `close()` for synchronous clients
-- Implement proper error handling and cleanup
-
-### Performance Optimization
-- Utilize caching for frequently accessed queries
-- Use the async client for concurrent operations
-- Batch related requests to maximize cache efficiency
-- Configure appropriate cache TTL based on your needs
-
-### Rate Limiting
-- Set `requests_per_minute` based on your requirements
-- Implement exponential backoff for rate limit errors
-- Monitor rate limit usage in production
+The client raises specific exceptions for invalid configuration, invalid query
+parameters, HTTP failures, rate limits, and feed parsing failures.
 
 ## Development
 
-### Setting up the Development Environment
-
 ```bash
-# Clone the repository
 git clone https://github.com/ma2za/google-news-api.git
 cd google-news-api
-
-# Install development dependencies
 poetry install --with dev
-
-# Set up pre-commit hooks
 pre-commit install
 ```
 
-### Running Tests
+Run the same checks as the GitHub Actions workflow before opening a pull
+request:
 
 ```bash
-# Run tests with Poetry
+poetry run black --check google_news_api tests examples mcp_server
+poetry run isort --check-only google_news_api tests examples mcp_server
+poetry run flake8 google_news_api tests examples mcp_server
 poetry run pytest
-
-# Include live Google News integration tests
-poetry run pytest --run-integration
-
-# Run tests with coverage
-poetry run pytest --cov=google_news_api
-
-# Run pre-commit on all files
-pre-commit run --all-files
 ```
 
-The default test command skips tests that make live network calls. CI runs this
-stable test set on supported Python versions.
+The default test command skips tests that make live network calls. To include
+live Google News integration tests:
+
+```bash
+poetry run pytest --run-integration
+```
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests and linting (`poetry run pytest` and `poetry run flake8`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+1. Fork the repository.
+2. Create a branch.
+3. Make the smallest useful change.
+4. Run the same checks as CI.
+5. Open a pull request with the behavior change and test coverage clearly
+   described.
+
+## Support The Project
+
+If this Google News API Python client saves you time, consider sponsoring the
+project:
+
+[Sponsor ma2za on GitHub](https://github.com/sponsors/ma2za)
+
+Stars, bug reports, and focused pull requests also help maintain the project.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Author
-
-Paolo Mazza (mazzapaolo2019@gmail.com)
+MIT License. See [LICENSE](LICENSE).
 
 ## Acknowledgments
 
-- The URL decoding functionality is based on the work of [SSujitX/google-news-url-decoder](https://github.com/SSujitX/google-news-url-decoder)
-
-## Support
-
-For issues, feature requests, or questions:
-- Open an issue on GitHub
-- Contact the author via email
-- Check the [examples](examples/) directory for more usage scenarios
+URL decoding is based on the work of
+[SSujitX/google-news-url-decoder](https://github.com/SSujitX/google-news-url-decoder).

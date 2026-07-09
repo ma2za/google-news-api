@@ -1374,6 +1374,7 @@ def test_searchapi_light_mode(monkeypatch):
                         "source": "Example",
                         "date": "2026-05-22",
                         "snippet": "Python summary",
+                        "id": "light-id",
                     }
                 ]
             },
@@ -1391,6 +1392,7 @@ def test_searchapi_light_mode(monkeypatch):
             "published": "2026-05-22",
             "summary": "Python summary",
             "source": "Example",
+            "id": "light-id",
         }
     ]
 
@@ -1433,6 +1435,7 @@ def test_searchapi_portal_mode(monkeypatch):
             "published": "2026-05-22T12:00:00Z",
             "summary": "Portal summary",
             "source": "Portal Source",
+            "id": None,
         }
     ]
 
@@ -1457,6 +1460,7 @@ async def test_async_searchapi_light_mode(monkeypatch):
                             "source": "Example",
                             "date": "2026-05-22",
                             "snippet": "Async summary",
+                            "id": "async-light-id",
                         }
                     ]
                 },
@@ -1468,3 +1472,4 @@ async def test_async_searchapi_light_mode(monkeypatch):
         articles = await client.search("python", mode="searchapi_light")
 
     assert articles[0]["title"] == "Async News"
+    assert articles[0]["id"] == "async-light-id"

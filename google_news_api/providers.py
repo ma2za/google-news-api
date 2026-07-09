@@ -190,6 +190,7 @@ class SearchAPIProvider:
                 or article.get("iso_date"),
                 "summary": article.get("summary") or article.get("snippet", ""),
                 "source": self._source_name(article.get("source")),
+                "id": article.get("id"),
             }
             for article in selected
         ]
