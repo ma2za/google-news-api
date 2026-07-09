@@ -33,6 +33,36 @@ for article in articles:
     print(article["link"])
 ```
 
+## Command Line
+
+The package also installs a `google-news` command for quick searches and
+exports:
+
+```bash
+google-news search "artificial intelligence" --when 24h --max-results 5
+```
+
+Export machine-readable results as JSON or CSV:
+
+```bash
+google-news search "python" --format json
+google-news top --topic TECHNOLOGY --max-results 10 --format csv
+```
+
+Decode Google News RSS links to publisher URLs when exporting:
+
+```bash
+google-news search "climate change" --when 7d --decode-links --format json
+```
+
+Use the same SearchAPI modes as the Python client:
+
+```bash
+google-news search "artificial intelligence regulation" \
+  --mode searchapi_light \
+  --format json
+```
+
 ## What You Get
 
 | Capability | Support |
@@ -44,6 +74,7 @@ for article in articles:
 | URL decoding | Decode Google News RSS article links to publisher URLs |
 | Batch search | Search several queries with shared filters |
 | SearchAPI modes | Optional direct publisher URLs and richer snippets |
+| CLI exports | Table, JSON, and CSV output from the `google-news` command |
 | MCP server | `google-news-mcp` for agent and AI tool workflows |
 
 ## Article Results

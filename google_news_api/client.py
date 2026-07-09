@@ -15,7 +15,7 @@ import re
 import time
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from urllib.parse import quote, urlencode, urlparse
 
 import feedparser
@@ -32,6 +32,7 @@ from .exceptions import (
     ValidationError,
 )
 from .providers import DEFAULT_MODE, SEARCHAPI_PROVIDER, validate_mode
+from .types import Article
 from .utils import (
     AsyncCache,
     AsyncRateLimiter,
@@ -279,7 +280,7 @@ class BaseGoogleNewsClient(ABC):
 
     def _parse_articles(
         self, feed: FeedParserDict, max_results: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Article]:
         if max_results == 0:
             return []
         # A positive value caps the results; None or a negative value (treated
@@ -450,7 +451,7 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         when: Optional[str] = None,
         max_results: Optional[int] = None,
         mode: str = DEFAULT_MODE,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Article]:
         """Search for news articles.
 
         Args:
@@ -518,7 +519,7 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         when: Optional[str] = None,
         max_results: Optional[int] = None,
         mode: str = DEFAULT_MODE,
-    ) -> Dict[str, List[Dict[str, Any]]]:
+    ) -> Dict[str, List[Article]]:
         """Perform multiple searches in batch.
 
         Args:
@@ -588,7 +589,7 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         *,
         max_results: Optional[int] = None,
         mode: str = DEFAULT_MODE,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Article]:
         """Get top news articles for a topic."""
         validate_mode(mode)
         if mode != DEFAULT_MODE:
@@ -842,7 +843,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         when: Optional[str] = None,
         max_results: Optional[int] = None,
         mode: str = DEFAULT_MODE,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Article]:
         """Search for news articles asynchronously.
 
         Args:
@@ -914,7 +915,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         delay: float = 1.0,
         show_progress: bool = False,
         mode: str = DEFAULT_MODE,
-    ) -> Dict[str, List[Dict[str, Any]]]:
+    ) -> Dict[str, List[Article]]:
         """Perform multiple searches in batch asynchronously.
 
         Args:
@@ -975,7 +976,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
 
         async def _search_with_progress(
             query: str,
-        ) -> Tuple[str, List[Dict[str, Any]]]:
+        ) -> Tuple[str, List[Article]]:
             try:
                 async with semaphore:
                     await asyncio.sleep(delay)
@@ -1013,7 +1014,7 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         *,
         max_results: Optional[int] = None,
         mode: str = DEFAULT_MODE,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Article]:
         """Get top news articles for a topic asynchronously."""
         validate_mode(mode)
         if mode != DEFAULT_MODE:

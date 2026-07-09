@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from .exceptions import ConfigurationError, HTTPError, ParsingError, ValidationError
+from .types import Article
 
 DEFAULT_MODE = "default"
 SEARCHAPI_LIGHT_MODE = "searchapi_light"
@@ -39,7 +40,7 @@ class SearchAPIProvider:
         country: str,
         language: str,
         max_results: Optional[int],
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Article]:
         params = self._params(query, mode, country, language)
         # A negative max_results is treated as "no limit" (like None): fall back
         # to the default ceiling instead of disabling the pagination loop.
@@ -75,7 +76,7 @@ class SearchAPIProvider:
         country: str,
         language: str,
         max_results: Optional[int],
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Article]:
         params = self._params(query, mode, country, language)
         # A negative max_results is treated as "no limit" (like None): fall back
         # to the default ceiling instead of disabling the pagination loop.
@@ -175,7 +176,7 @@ class SearchAPIProvider:
         self,
         articles: List[Dict[str, Any]],
         max_results: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Article]:
         if max_results == 0:
             return []
 

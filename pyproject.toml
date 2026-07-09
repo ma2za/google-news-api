@@ -1,6 +1,6 @@
 [project]
 name = "google-news-api"
-version = "0.0.11"
+version = "0.0.12"
 description = "Unofficial Python client for Google News RSS with sync, async, URL decoding, caching, and MCP support."
 authors = [
     {name = "Paolo Mazza",email = "mazzapaolo2019@gmail.com"}
@@ -48,12 +48,14 @@ mcp = [
 ]
 
 [project.scripts]
+google-news = "google_news_api.cli:main"
 google-news-mcp = "google_news_api.mcp_server:main"
 
 [project.urls]
 Homepage = "https://github.com/ma2za/google-news-api"
 Repository = "https://github.com/ma2za/google-news-api"
 Issues = "https://github.com/ma2za/google-news-api/issues"
+Changelog = "https://github.com/ma2za/google-news-api/blob/main/CHANGELOG.md"
 
 
 [build-system]
@@ -121,4 +123,3 @@ exclude_lines = [
 members = [
     "mcp_server",
 ]
-

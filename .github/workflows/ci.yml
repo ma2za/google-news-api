@@ -8,6 +8,23 @@ on:
   workflow_dispatch:
 
 jobs:
+  install-smoke:
+    name: Python 3.9 install smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install package
+        run: python -m pip install .
+
+      - name: Import package
+        run: |
+          python -c "from google_news_api import Article, EnrichedArticle, GoogleNewsClient; print(GoogleNewsClient, Article, EnrichedArticle)"
+
   test:
     name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest

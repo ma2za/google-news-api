@@ -13,6 +13,7 @@ from .exceptions import (
     ValidationError,
 )
 from .logging import setup_logging
+from .types import Article, EnrichedArticle
 from .utils import AsyncCache, AsyncRateLimiter, Cache, RateLimiter
 
 try:
@@ -34,6 +35,8 @@ __all__ = [
     "RateLimitError",
     "ValidationError",
     "setup_logging",
+    "Article",
+    "EnrichedArticle",
     "AsyncCache",
     "AsyncRateLimiter",
     "Cache",
