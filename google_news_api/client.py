@@ -294,9 +294,37 @@ class BaseGoogleNewsClient(ABC):
                 "published": entry.published,
                 "summary": entry.get("summary", ""),
                 "source": entry.source.title if "source" in entry else None,
+                "id": self._get_article_id(entry),
             }
             for entry in articles
         ]
+
+    @staticmethod
+    def _get_article_id(entry: FeedParserDict) -> Optional[str]:
+        article_id = entry.get("id") or getattr(entry, "id", None)
+        if article_id:
+            return (
+                BaseGoogleNewsClient._get_google_news_article_id(article_id)
+                or article_id
+            )
+
+        link = entry.get("link") or getattr(entry, "link", None)
+        if not link:
+            return None
+
+        return BaseGoogleNewsClient._get_google_news_article_id(link)
+
+    @staticmethod
+    def _get_google_news_article_id(url: str) -> Optional[str]:
+        parsed_url = urlparse(url)
+        if not parsed_url.netloc.endswith("news.google.com"):
+            return None
+
+        path_parts = parsed_url.path.rstrip("/").split("/")
+        if len(path_parts) >= 2 and path_parts[-2] == "articles":
+            return path_parts[-1]
+
+        return None
 
     def _get_topic_path(self, topic: str) -> str:
         topic_map = {
