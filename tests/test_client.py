@@ -930,8 +930,7 @@ def test_parse_articles_includes_feed_entry_id():
     """Google News RSS guid values are exposed as article ids."""
     client = GoogleNewsClient()
     article_id = "CBMiTestArticleId"
-    feed = feedparser.parse(
-        f"""
+    feed = feedparser.parse(f"""
         <rss version="2.0">
           <channel>
             <item>
@@ -942,8 +941,7 @@ def test_parse_articles_includes_feed_entry_id():
             </item>
           </channel>
         </rss>
-        """
-    )
+        """)
 
     articles = client._parse_articles(feed)
 
