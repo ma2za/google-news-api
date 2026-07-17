@@ -24,6 +24,7 @@ class FakeClient:
         self.language = language
         self.country = country
         self.search_kwargs = None
+        self.batch_search_kwargs = None
         self.top_news_kwargs = None
         self.decode_calls = []
         FakeClient.instances.append(self)
@@ -42,6 +43,11 @@ class FakeClient:
     def top_news(self, **kwargs):
         self.top_news_kwargs = kwargs
         return [dict(article) for article in ARTICLES]
+
+    def batch_search(self, queries, **kwargs):
+        self.batch_queries = queries
+        self.batch_search_kwargs = kwargs
+        return {query: [dict(ARTICLES[0])] for query in queries}
 
     def decode_urls(self, urls, **kwargs):
         self.decode_calls.append((urls, kwargs))
@@ -90,6 +96,8 @@ def test_cli_search_writes_json_and_passes_filters(monkeypatch):
         "when": "24h",
         "max_results": 5,
         "mode": "searchapi_light",
+        "include_domains": None,
+        "exclude_domains": None,
     }
     assert json.loads(output.getvalue()) == ARTICLES
 
@@ -152,3 +160,90 @@ def test_cli_decode_links_preserves_google_link(monkeypatch):
     ]
     assert articles[0]["link"] == "https://example.com/python"
     assert articles[0]["google_link"] == "https://news.google.com/rss/articles/python"
+
+
+def test_cli_search_passes_domain_filters(monkeypatch):
+    install_fake_client(monkeypatch)
+
+    exit_code = cli.main(
+        [
+            "search",
+            "python",
+            "--include-domain",
+            "reuters.com",
+            "--include-domain",
+            "apnews.com",
+            "--exclude-domain",
+            "youtube.com",
+            "--format",
+            "json",
+        ],
+        output=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    assert FakeClient.instances[0].search_kwargs["include_domains"] == [
+        "reuters.com",
+        "apnews.com",
+    ]
+    assert FakeClient.instances[0].search_kwargs["exclude_domains"] == ["youtube.com"]
+
+
+def test_cli_batch_writes_grouped_json(monkeypatch):
+    install_fake_client(monkeypatch)
+    output = io.StringIO()
+
+    exit_code = cli.main(
+        [
+            "batch",
+            "python",
+            "rust",
+            "--include-domain",
+            "example.com",
+            "--format",
+            "json",
+        ],
+        output=output,
+    )
+
+    client = FakeClient.instances[0]
+    assert exit_code == 0
+    assert client.batch_queries == ["python", "rust"]
+    assert client.batch_search_kwargs["include_domains"] == ["example.com"]
+    assert list(json.loads(output.getvalue())) == ["python", "rust"]
+
+
+def test_write_batch_articles_flattens_csv():
+    output = io.StringIO()
+
+    cli._write_batch_articles({"python": ARTICLES}, "csv", output)
+
+    rows = output.getvalue().splitlines()
+    assert rows[0].startswith("query,title,source,published")
+    assert rows[1].startswith("python,Python News,Example,2026-07-09")
+
+
+def test_write_batch_articles_labels_table_sections():
+    output = io.StringIO()
+
+    cli._write_batch_articles({"python": ARTICLES, "rust": ARTICLES}, "table", output)
+
+    assert "QUERY: python" in output.getvalue()
+    assert "QUERY: rust" in output.getvalue()
+
+
+def test_cli_batch_decodes_each_result_group(monkeypatch):
+    install_fake_client(monkeypatch)
+    output = io.StringIO()
+
+    exit_code = cli.main(
+        ["batch", "python", "rust", "--decode-links", "--format", "json"],
+        output=output,
+    )
+
+    client = FakeClient.instances[0]
+    results = json.loads(output.getvalue())
+    assert exit_code == 0
+    assert len(client.decode_calls) == 2
+    assert results["python"][0]["google_link"].startswith("https://news.google.com/")
+    assert results["rust"][0]["link"] == "https://example.com/python"

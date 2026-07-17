@@ -4,7 +4,7 @@ import argparse
 import csv
 import json
 import sys
-from typing import Iterable, List, Optional, Sequence, TextIO
+from typing import Dict, Iterable, List, Optional, Sequence, TextIO
 
 from .client import GoogleNewsClient
 from .exceptions import GoogleNewsError
@@ -28,6 +28,15 @@ def _parser() -> argparse.ArgumentParser:
     search.add_argument("--after")
     search.add_argument("--before")
     search.add_argument("--when")
+    _add_domain_options(search)
+
+    batch = subparsers.add_parser("batch", help="Search several news queries")
+    batch.add_argument("queries", nargs="+")
+    _add_common_options(batch)
+    batch.add_argument("--after")
+    batch.add_argument("--before")
+    batch.add_argument("--when")
+    _add_domain_options(batch)
 
     top = subparsers.add_parser("top", help="Fetch top news by topic")
     top.add_argument("--topic", default="WORLD")
@@ -48,6 +57,11 @@ def _add_common_options(parser: argparse.ArgumentParser) -> None:
         dest="output_format",
     )
     parser.add_argument("--decode-links", action="store_true")
+
+
+def _add_domain_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--include-domain", action="append", dest="include_domains")
+    parser.add_argument("--exclude-domain", action="append", dest="exclude_domains")
 
 
 def _decode_articles(
@@ -114,6 +128,35 @@ def _write_articles(
         _write_table(articles, output)
 
 
+def _write_batch_articles(
+    results: Dict[str, List[Article]], output_format: str, output: TextIO
+) -> None:
+    if output_format == "json":
+        json.dump(results, output, indent=2)
+        output.write("\n")
+        return
+
+    if output_format == "csv":
+        fieldnames = ("query", *CSV_FIELDS)
+        writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        for query, articles in results.items():
+            for article in articles:
+                writer.writerow(
+                    {
+                        "query": query,
+                        **{field: article.get(field) for field in CSV_FIELDS},
+                    }
+                )
+        return
+
+    for index, (query, articles) in enumerate(results.items()):
+        if index:
+            output.write("\n")
+        output.write(f"QUERY: {query}\n")
+        _write_table(articles, output)
+
+
 def _run(args: argparse.Namespace, output: TextIO) -> None:
     with GoogleNewsClient(language=args.language, country=args.country) as client:
         if args.command == "search":
@@ -124,7 +167,27 @@ def _run(args: argparse.Namespace, output: TextIO) -> None:
                 when=args.when,
                 max_results=args.max_results,
                 mode=args.mode,
+                include_domains=args.include_domains,
+                exclude_domains=args.exclude_domains,
             )
+        elif args.command == "batch":
+            results = client.batch_search(
+                args.queries,
+                after=args.after,
+                before=args.before,
+                when=args.when,
+                max_results=args.max_results,
+                mode=args.mode,
+                include_domains=args.include_domains,
+                exclude_domains=args.exclude_domains,
+            )
+            if args.decode_links:
+                results = {
+                    query: _decode_articles(client, articles)
+                    for query, articles in results.items()
+                }
+            _write_batch_articles(results, args.output_format, output)
+            return
         else:
             articles = client.top_news(
                 topic=args.topic,

@@ -9,6 +9,7 @@ INTEGRATION_TESTS = {
     "test_search_with_date_range_content",
     "test_search_with_relative_time",
     "test_search_with_relative_time_content",
+    "test_search_with_domain_filter",
     "test_async_search_with_time_parameters",
     "test_async_search_with_time_parameters_content",
     "test_sync_client_search",

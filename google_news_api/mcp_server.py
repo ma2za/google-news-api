@@ -2,7 +2,7 @@
 
 import asyncio
 import sys
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from google_news_api.client import AsyncGoogleNewsClient
 
@@ -124,6 +124,8 @@ async def news_search(
     decode_links: bool = True,
     extract_text: bool = True,
     mode: str = "default",
+    include_domains: Optional[List[str]] = None,
+    exclude_domains: Optional[List[str]] = None,
 ) -> List[dict[str, Any]]:
     client = await get_client(language, country)
     try:
@@ -134,6 +136,8 @@ async def news_search(
             after=after,
             before=before,
             mode=mode,
+            include_domains=include_domains,
+            exclude_domains=exclude_domains,
         )
         return await _enrich_articles(
             client,
@@ -143,6 +147,48 @@ async def news_search(
         )
     except Exception as e:
         return [{"error": f"Failed to search news: {str(e)}"}]
+
+
+async def batch_news_search(
+    queries: List[str],
+    max_results: Optional[int] = None,
+    when: Optional[str] = None,
+    after: Optional[str] = None,
+    before: Optional[str] = None,
+    language: str = "en",
+    country: str = "US",
+    decode_links: bool = True,
+    extract_text: bool = True,
+    mode: str = "default",
+    include_domains: Optional[List[str]] = None,
+    exclude_domains: Optional[List[str]] = None,
+) -> Dict[str, List[dict[str, Any]]]:
+    client = await get_client(language, country)
+    try:
+        results = await client.batch_search(
+            queries=queries,
+            max_results=max_results,
+            when=when,
+            after=after,
+            before=before,
+            mode=mode,
+            include_domains=include_domains,
+            exclude_domains=exclude_domains,
+        )
+        enriched = await asyncio.gather(
+            *(
+                _enrich_articles(
+                    client,
+                    articles,
+                    decode_links=decode_links,
+                    extract_text=extract_text,
+                )
+                for articles in results.values()
+            )
+        )
+        return dict(zip(results, enriched))
+    except Exception as e:
+        return {"error": [{"error": f"Failed to batch search news: {str(e)}"}]}
 
 
 async def top_news(
@@ -175,6 +221,7 @@ def create_mcp_app():
     FastMCP = _load_fastmcp()
     mcp = FastMCP("googlenews")
     mcp.tool()(news_search)
+    mcp.tool()(batch_news_search)
     mcp.tool()(top_news)
     return mcp
 
