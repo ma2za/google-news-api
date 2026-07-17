@@ -35,6 +35,7 @@ class FakeClient:
         self.decoded_urls = decoded_urls or []
         self.decode_calls = []
         self.search_kwargs = None
+        self.batch_search_kwargs = None
         self.top_news_kwargs = None
 
     async def decode_urls(self, urls, **kwargs):
@@ -64,6 +65,21 @@ class FakeClient:
                 "source": "Example",
             }
         ]
+
+    async def batch_search(self, **kwargs):
+        self.batch_search_kwargs = kwargs
+        return {
+            query: [
+                {
+                    "title": query,
+                    "link": f"https://news.google.com/rss/articles/{query}",
+                    "published": "2026-01-01",
+                    "summary": "",
+                    "source": "Example",
+                }
+            ]
+            for query in kwargs["queries"]
+        }
 
 
 def install_article_dependency_fakes(monkeypatch):
@@ -207,6 +223,50 @@ async def test_mcp_news_search_passes_mode(monkeypatch):
     assert client.search_kwargs["max_results"] == 3
     assert client.search_kwargs["when"] == "24h"
     assert client.search_kwargs["mode"] == "searchapi_light"
+
+
+@pytest.mark.asyncio
+async def test_mcp_batch_search_passes_domain_filters(monkeypatch):
+    client = FakeClient()
+
+    async def get_client(language="en", country="US"):
+        return client
+
+    monkeypatch.setattr(mcp_server, "get_client", get_client)
+
+    result = await mcp_server.batch_news_search(
+        ["python", "rust"],
+        include_domains=["example.com"],
+        exclude_domains=["youtube.com"],
+        decode_links=False,
+        extract_text=False,
+    )
+
+    assert list(result) == ["python", "rust"]
+    assert client.batch_search_kwargs["include_domains"] == ["example.com"]
+    assert client.batch_search_kwargs["exclude_domains"] == ["youtube.com"]
+
+
+def test_mcp_app_registers_batch_search(monkeypatch):
+    registered = []
+
+    class FakeMCP:
+        def __init__(self, name):
+            self.name = name
+
+        def tool(self):
+            def register(function):
+                registered.append(function.__name__)
+                return function
+
+            return register
+
+    monkeypatch.setattr(mcp_server, "_load_fastmcp", lambda: FakeMCP)
+
+    app = mcp_server.create_mcp_app()
+
+    assert app.name == "googlenews"
+    assert registered == ["news_search", "batch_news_search", "top_news"]
 
 
 @pytest.mark.asyncio

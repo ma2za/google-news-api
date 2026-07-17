@@ -737,10 +737,11 @@ def test_build_url_preserves_special_characters():
     assert extract_query("python programming") == "python programming"
 
 
-def test_client_error_handling():
+def test_client_error_handling(monkeypatch):
     """Test error handling in the client."""
     import httpx
 
+    monkeypatch.setattr("google_news_api.utils.time.sleep", lambda _: None)
     client = GoogleNewsClient()
 
     # Test request error
@@ -844,10 +845,14 @@ def test_sync_decode_urls(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_async_client_error_handling():
+async def test_async_client_error_handling(monkeypatch):
     """Test error handling in the async client."""
     import httpx
 
+    async def no_sleep(_):
+        pass
+
+    monkeypatch.setattr("google_news_api.utils.asyncio.sleep", no_sleep)
     async with AsyncGoogleNewsClient() as client:
         # Test request error
         with pytest.raises(HTTPError) as exc_info:
@@ -1473,3 +1478,218 @@ async def test_async_searchapi_light_mode(monkeypatch):
 
     assert articles[0]["title"] == "Async News"
     assert articles[0]["id"] == "async-light-id"
+
+
+def test_build_search_query_with_domain_filters():
+    client = GoogleNewsClient()
+
+    query = client._build_search_query(
+        "artificial intelligence",
+        when="24h",
+        include_domains=[
+            "Reuters.com",
+            "https://apnews.com/hub/technology",
+            "reuters.com",
+        ],
+        exclude_domains=["youtube.com"],
+    )
+
+    assert query == (
+        "artificial intelligence (site:reuters.com OR site:apnews.com) "
+        "-site:youtube.com when:24h"
+    )
+
+
+@pytest.mark.parametrize(
+    "domains",
+    [
+        "example.com",
+        [""],
+        ["localhost"],
+        ["127.0.0.1"],
+        ["https://user@example.com"],
+        ["example.com:443"],
+        ["ftp://example.com"],
+        ["example.com?source=test"],
+    ],
+)
+def test_build_search_query_rejects_invalid_domains(domains):
+    client = GoogleNewsClient()
+
+    with pytest.raises(ValidationError):
+        client._build_search_query("python", include_domains=domains)
+
+
+def test_build_search_query_rejects_domain_overlap():
+    client = GoogleNewsClient()
+
+    with pytest.raises(ValidationError) as exc_info:
+        client._build_search_query(
+            "python",
+            include_domains=["example.com"],
+            exclude_domains=["https://example.com/news"],
+        )
+
+    assert "both included and excluded" in str(exc_info.value)
+
+
+def test_search_passes_domain_query_to_searchapi(monkeypatch):
+    from google_news_api.client import SEARCHAPI_PROVIDER
+
+    client = GoogleNewsClient()
+    captured = {}
+
+    def search(http_client, query, mode, country, language, max_results):
+        captured["query"] = query
+        return []
+
+    monkeypatch.setattr(SEARCHAPI_PROVIDER, "search", search)
+
+    assert (
+        client.search(
+            "python",
+            mode="searchapi_light",
+            include_domains=["example.com"],
+            exclude_domains=["spam.example"],
+        )
+        == []
+    )
+    assert captured["query"] == ("python site:example.com -site:spam.example")
+
+
+@pytest.mark.asyncio
+async def test_async_search_passes_domain_query_to_searchapi(monkeypatch):
+    from google_news_api.client import SEARCHAPI_PROVIDER
+
+    captured = {}
+
+    async def search_async(http_client, query, mode, country, language, max_results):
+        captured["query"] = query
+        return []
+
+    monkeypatch.setattr(SEARCHAPI_PROVIDER, "search_async", search_async)
+
+    async with AsyncGoogleNewsClient() as client:
+        assert (
+            await client.search(
+                "python",
+                mode="searchapi_light",
+                include_domains=["example.com"],
+            )
+            == []
+        )
+
+    assert captured["query"] == "python site:example.com"
+
+
+def test_search_passes_domain_query_to_rss(monkeypatch):
+    from urllib.parse import parse_qs, urlparse
+
+    from feedparser import FeedParserDict
+
+    client = GoogleNewsClient()
+    captured = {}
+
+    def fetch_feed(url):
+        captured["url"] = url
+        feed = FeedParserDict()
+        feed.entries = []
+        return feed
+
+    monkeypatch.setattr(client, "_fetch_feed", fetch_feed)
+
+    assert (
+        client.search(
+            "python",
+            when="24h",
+            include_domains=["example.com"],
+            exclude_domains=["spam.example"],
+        )
+        == []
+    )
+    assert parse_qs(urlparse(captured["url"]).query)["q"] == [
+        "python site:example.com -site:spam.example when:24h"
+    ]
+
+
+def test_search_preserves_query_validation_precedence():
+    client = GoogleNewsClient()
+
+    with pytest.raises(ValidationError) as exc_info:
+        client.search("", mode="invalid")
+
+    assert "Query must be" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_async_search_preserves_query_validation_precedence():
+    async with AsyncGoogleNewsClient() as client:
+        with pytest.raises(ValidationError) as exc_info:
+            await client.search("", mode="invalid")
+
+    assert "Query must be" in str(exc_info.value)
+
+
+def test_batch_search_forwards_normalized_domain_filters(monkeypatch):
+    client = GoogleNewsClient()
+    calls = []
+
+    def search(query, **kwargs):
+        calls.append((query, kwargs))
+        return []
+
+    monkeypatch.setattr(client, "search", search)
+
+    results = client.batch_search(
+        ["python", "rust"],
+        include_domains=["https://Example.com/news", "example.com"],
+        exclude_domains=["spam.example"],
+    )
+
+    assert results == {"python": [], "rust": []}
+    assert [query for query, _ in calls] == ["python", "rust"]
+    assert all(
+        kwargs["include_domains"] == ["example.com"]
+        and kwargs["exclude_domains"] == ["spam.example"]
+        for _, kwargs in calls
+    )
+
+
+@pytest.mark.asyncio
+async def test_async_batch_search_forwards_normalized_domain_filters(monkeypatch):
+    async with AsyncGoogleNewsClient() as client:
+        calls = []
+
+        async def search(query, **kwargs):
+            calls.append((query, kwargs))
+            return []
+
+        monkeypatch.setattr(client, "search", search)
+
+        results = await client.batch_search(
+            ["python", "rust"],
+            include_domains=["https://Example.com/news", "example.com"],
+            exclude_domains=["spam.example"],
+            delay=0,
+        )
+
+    assert results == {"python": [], "rust": []}
+    assert {query for query, _ in calls} == {"python", "rust"}
+    assert all(
+        kwargs["include_domains"] == ["example.com"]
+        and kwargs["exclude_domains"] == ["spam.example"]
+        for _, kwargs in calls
+    )
+
+
+def test_search_with_domain_filter():
+    with GoogleNewsClient() as client:
+        articles = client.search(
+            "world news",
+            when="7d",
+            include_domains=["reuters.com"],
+            max_results=3,
+        )
+
+    assert articles
+    assert all(article["title"] and article["link"] for article in articles)

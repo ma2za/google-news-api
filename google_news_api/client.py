@@ -7,6 +7,7 @@ AsyncGoogleNewsClient for usage.
 """
 
 import asyncio
+import ipaddress
 import json
 import logging
 import platform
@@ -218,17 +219,134 @@ class BaseGoogleNewsClient(ABC):
                 value=when,
             )
 
-        # Extract number and unit
         number = int(when[:-1])
         unit = when[-1]
-
-        # Validate limits
         if unit == "h" and number > 101:
             raise ValidationError(
                 "Hour range must be <= 101",
                 field="when",
                 value=when,
             )
+
+    @staticmethod
+    def _normalize_domains(domains: Optional[List[str]], field: str) -> List[str]:
+        if domains is None:
+            return []
+        if not isinstance(domains, list):
+            raise ValidationError(
+                f"{field} must be a list of domains",
+                field=field,
+                value=domains,
+            )
+
+        normalized = []
+        for domain in domains:
+            if not isinstance(domain, str) or not domain.strip():
+                raise ValidationError(
+                    f"{field} entries must be non-empty domains",
+                    field=field,
+                    value=domain,
+                )
+
+            value = domain.strip()
+            parsed = urlparse(value if "://" in value else f"//{value}")
+            if parsed.scheme and parsed.scheme not in {"http", "https"}:
+                raise ValidationError(
+                    f"{field} entries must use http or https",
+                    field=field,
+                    value=domain,
+                )
+            try:
+                port = parsed.port
+            except ValueError as e:
+                raise ValidationError(
+                    f"Invalid domain in {field}", field=field, value=domain
+                ) from e
+
+            hostname = (parsed.hostname or "").rstrip(".").lower()
+            if (
+                not hostname
+                or parsed.username is not None
+                or parsed.password is not None
+                or port is not None
+                or parsed.query
+                or parsed.fragment
+            ):
+                raise ValidationError(
+                    f"Invalid domain in {field}", field=field, value=domain
+                )
+
+            try:
+                ipaddress.ip_address(hostname)
+            except ValueError:
+                pass
+            else:
+                raise ValidationError(
+                    f"IP addresses are not supported in {field}",
+                    field=field,
+                    value=domain,
+                )
+
+            labels = hostname.split(".")
+            if len(labels) < 2 or any(
+                not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label)
+                for label in labels
+            ):
+                raise ValidationError(
+                    f"Invalid domain in {field}", field=field, value=domain
+                )
+            if hostname not in normalized:
+                normalized.append(hostname)
+
+        return normalized
+
+    def _build_search_query(
+        self,
+        query: str,
+        *,
+        after: Optional[str] = None,
+        before: Optional[str] = None,
+        when: Optional[str] = None,
+        include_domains: Optional[List[str]] = None,
+        exclude_domains: Optional[List[str]] = None,
+    ) -> str:
+        self._validate_query(query)
+        included = self._normalize_domains(include_domains, "include_domains")
+        excluded = self._normalize_domains(exclude_domains, "exclude_domains")
+        overlap = [domain for domain in included if domain in excluded]
+        if overlap:
+            raise ValidationError(
+                "A domain cannot be both included and excluded",
+                field="include_domains",
+                value=overlap,
+            )
+
+        query_parts = [query]
+        if len(included) == 1:
+            query_parts.append(f"site:{included[0]}")
+        elif included:
+            sites = " OR ".join(f"site:{domain}" for domain in included)
+            query_parts.append(f"({sites})")
+        query_parts.extend(f"-site:{domain}" for domain in excluded)
+
+        if when is not None:
+            if after is not None or before is not None:
+                raise ValidationError(
+                    "Cannot use 'when' parameter together with 'after' or 'before'",
+                    field="when",
+                    value=when,
+                )
+            self._validate_when(when)
+            query_parts.append(f"when:{when}")
+        else:
+            if after is not None:
+                self._validate_date(after, "after")
+                query_parts.append(f"after:{after}")
+            if before is not None:
+                self._validate_date(before, "before")
+                query_parts.append(f"before:{before}")
+
+        return " ".join(query_parts)
 
     def _build_url(self, path: str) -> str:
         """Build the URL for the request.
@@ -451,6 +569,8 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         when: Optional[str] = None,
         max_results: Optional[int] = None,
         mode: str = DEFAULT_MODE,
+        include_domains: Optional[List[str]] = None,
+        exclude_domains: Optional[List[str]] = None,
     ) -> List[Article]:
         """Search for news articles.
 
@@ -462,6 +582,8 @@ class GoogleNewsClient(BaseGoogleNewsClient):
             max_results: Maximum number of results to return
             mode: Search backend. One of "default", "searchapi_light",
                 or "searchapi_portal"
+            include_domains: Publisher domains to include in search results
+            exclude_domains: Publisher domains to exclude from search results
 
         Returns:
             List of article dictionaries
@@ -474,28 +596,14 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         """
         self._validate_query(query)
         validate_mode(mode)
-
-        # Build query with time parameters
-        query_parts = [query]
-
-        if when is not None:
-            if after is not None or before is not None:
-                raise ValidationError(
-                    "Cannot use 'when' parameter together with 'after' or 'before'",
-                    field="when",
-                    value=when,
-                )
-            self._validate_when(when)
-            query_parts.append(f"when:{when}")
-        else:
-            if after is not None:
-                self._validate_date(after, "after")
-                query_parts.append(f"after:{after}")
-            if before is not None:
-                self._validate_date(before, "before")
-                query_parts.append(f"before:{before}")
-
-        final_query = " ".join(query_parts)
+        final_query = self._build_search_query(
+            query,
+            after=after,
+            before=before,
+            when=when,
+            include_domains=include_domains,
+            exclude_domains=exclude_domains,
+        )
         if mode != DEFAULT_MODE:
             return SEARCHAPI_PROVIDER.search(
                 self._client,
@@ -519,6 +627,8 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         when: Optional[str] = None,
         max_results: Optional[int] = None,
         mode: str = DEFAULT_MODE,
+        include_domains: Optional[List[str]] = None,
+        exclude_domains: Optional[List[str]] = None,
     ) -> Dict[str, List[Article]]:
         """Perform multiple searches in batch.
 
@@ -530,6 +640,8 @@ class GoogleNewsClient(BaseGoogleNewsClient):
             max_results: Maximum number of results to return per query
             mode: Search backend. One of "default", "searchapi_light",
                 or "searchapi_portal"
+            include_domains: Publisher domains to include in every search
+            exclude_domains: Publisher domains to exclude from every search
 
         Returns:
             Dictionary mapping each query to its list of article results
@@ -550,6 +662,14 @@ class GoogleNewsClient(BaseGoogleNewsClient):
                 value=queries,
             )
         validate_mode(mode)
+        included = self._normalize_domains(include_domains, "include_domains")
+        excluded = self._normalize_domains(exclude_domains, "exclude_domains")
+        if any(domain in excluded for domain in included):
+            raise ValidationError(
+                "A domain cannot be both included and excluded",
+                field="include_domains",
+                value=[domain for domain in included if domain in excluded],
+            )
 
         # Validate time parameters once before running searches
         if when is not None:
@@ -576,6 +696,8 @@ class GoogleNewsClient(BaseGoogleNewsClient):
                     when=when,
                     max_results=max_results,
                     mode=mode,
+                    include_domains=included,
+                    exclude_domains=excluded,
                 )
             except ValidationError as e:
                 logger.error(f"Error searching for query '{query}': {str(e)}")
@@ -843,6 +965,8 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         when: Optional[str] = None,
         max_results: Optional[int] = None,
         mode: str = DEFAULT_MODE,
+        include_domains: Optional[List[str]] = None,
+        exclude_domains: Optional[List[str]] = None,
     ) -> List[Article]:
         """Search for news articles asynchronously.
 
@@ -854,6 +978,8 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
             max_results: Maximum number of results to return
             mode: Search backend. One of "default", "searchapi_light",
                 or "searchapi_portal"
+            include_domains: Publisher domains to include in search results
+            exclude_domains: Publisher domains to exclude from search results
 
         Returns:
             List of article dictionaries
@@ -866,28 +992,14 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         """
         self._validate_query(query)
         validate_mode(mode)
-
-        # Build query with time parameters
-        query_parts = [query]
-
-        if when is not None:
-            if after is not None or before is not None:
-                raise ValidationError(
-                    "Cannot use 'when' parameter together with 'after' or 'before'",
-                    field="when",
-                    value=when,
-                )
-            self._validate_when(when)
-            query_parts.append(f"when:{when}")
-        else:
-            if after is not None:
-                self._validate_date(after, "after")
-                query_parts.append(f"after:{after}")
-            if before is not None:
-                self._validate_date(before, "before")
-                query_parts.append(f"before:{before}")
-
-        final_query = " ".join(query_parts)
+        final_query = self._build_search_query(
+            query,
+            after=after,
+            before=before,
+            when=when,
+            include_domains=include_domains,
+            exclude_domains=exclude_domains,
+        )
         if mode != DEFAULT_MODE:
             return await SEARCHAPI_PROVIDER.search_async(
                 self.client,
@@ -915,6 +1027,8 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         delay: float = 1.0,
         show_progress: bool = False,
         mode: str = DEFAULT_MODE,
+        include_domains: Optional[List[str]] = None,
+        exclude_domains: Optional[List[str]] = None,
     ) -> Dict[str, List[Article]]:
         """Perform multiple searches in batch asynchronously.
 
@@ -930,6 +1044,8 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
             show_progress: Whether to show a progress bar
             mode: Search backend. One of "default", "searchapi_light",
                 or "searchapi_portal"
+            include_domains: Publisher domains to include in every search
+            exclude_domains: Publisher domains to exclude from every search
 
         Returns:
             Dictionary mapping each query to its list of article results
@@ -951,6 +1067,14 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
                 value=queries,
             )
         validate_mode(mode)
+        included = self._normalize_domains(include_domains, "include_domains")
+        excluded = self._normalize_domains(exclude_domains, "exclude_domains")
+        if any(domain in excluded for domain in included):
+            raise ValidationError(
+                "A domain cannot be both included and excluded",
+                field="include_domains",
+                value=[domain for domain in included if domain in excluded],
+            )
 
         # Validate time parameters once before running searches
         if when is not None:
@@ -987,6 +1111,8 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
                         when=when,
                         max_results=max_results,
                         mode=mode,
+                        include_domains=included,
+                        exclude_domains=excluded,
                     )
                     if pbar is not None:
                         pbar.update(1)

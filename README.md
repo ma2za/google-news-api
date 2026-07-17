@@ -4,9 +4,9 @@
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
 [![PyPI Version](https://img.shields.io/pypi/v/google-news-api)](https://pypi.org/project/google-news-api/)
 
-Unofficial Python client for Google News RSS. Search Google News, fetch top
-stories by topic, filter by date or recency, decode Google News article URLs,
-and use the same tools from async code or an MCP server.
+Unofficial Python client for Google News RSS. Search trusted publishers, run
+batch research, fetch top stories, decode article URLs, and use the same tools
+from async code, the command line, or an MCP server.
 
 This package is not an official Google API. It uses Google News RSS feeds by
 default and offers optional SearchAPI-backed modes when you need provider URLs
@@ -42,6 +42,24 @@ exports:
 google-news search "artificial intelligence" --when 24h --max-results 5
 ```
 
+Limit results to trusted publishers and exclude unwanted domains:
+
+```bash
+google-news search "artificial intelligence" \
+  --include-domain reuters.com \
+  --include-domain apnews.com \
+  --exclude-domain youtube.com \
+  --when 7d
+```
+
+Run several research queries with the same filters:
+
+```bash
+google-news batch "AI regulation" "semiconductor supply chain" \
+  --include-domain reuters.com \
+  --format json
+```
+
 Export machine-readable results as JSON or CSV:
 
 ```bash
@@ -70,6 +88,7 @@ google-news search "artificial intelligence regulation" \
 | Google News search | Keyword search through Google News RSS |
 | Top stories | Topic feeds for world, nation, business, technology, sports, science, health, and entertainment |
 | Date filters | `after`, `before`, and relative `when` filters |
+| Domain filters | Include trusted publishers or exclude unwanted domains |
 | Sync and async clients | `GoogleNewsClient` and `AsyncGoogleNewsClient` |
 | URL decoding | Decode Google News RSS article links to publisher URLs |
 | Batch search | Search several queries with shared filters |
@@ -127,6 +146,22 @@ with GoogleNewsClient() as client:
 Use `when` for relative time filters such as `"1h"`, `"24h"`, or `"7d"`.
 Use `after` and `before` for `YYYY-MM-DD` date range searches. `when` cannot be
 combined with `after` or `before`.
+
+### Search Trusted Domains
+
+```python
+with GoogleNewsClient() as client:
+    articles = client.search(
+        "artificial intelligence",
+        include_domains=["reuters.com", "apnews.com"],
+        exclude_domains=["youtube.com"],
+        when="7d",
+    )
+```
+
+Domain filters are optional and work with `search()` and `batch_search()` on
+both synchronous and asynchronous clients. Existing query strings and result
+dictionaries are unchanged.
 
 ### Decode Google News URLs
 
@@ -206,9 +241,9 @@ The packaged entrypoints are the `google-news-mcp` command and the
 `mcp_server/googlenews.py` script remains as a local development compatibility
 wrapper.
 
-The MCP server exposes `news_search` and `top_news`. By default, both tools
+The MCP server exposes `news_search`, `batch_news_search`, and `top_news`. By default, the tools
 decode Google News links to publisher URLs, store the original URL in
-`google_link`, and extract article text when possible. Both tools also accept
+`google_link`, and extract article text when possible. The tools also accept
 `mode` for the same search modes as the Python client.
 
 For faster headline-only calls:

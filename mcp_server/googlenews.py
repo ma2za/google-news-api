@@ -2,6 +2,7 @@
 
 from google_news_api.mcp_server import (
     _attach_extracted_text,
+    batch_news_search,
     create_mcp_app,
     extract_article_text,
     get_client,
@@ -12,6 +13,7 @@ from google_news_api.mcp_server import (
 
 __all__ = [
     "_attach_extracted_text",
+    "batch_news_search",
     "create_mcp_app",
     "extract_article_text",
     "get_client",

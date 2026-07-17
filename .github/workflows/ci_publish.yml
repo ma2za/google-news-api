@@ -26,9 +26,15 @@ jobs:
       - name: Install dependencies
         run: poetry install --with dev
 
+      - name: Verify release version
+        if: github.event_name == 'release'
+        shell: bash
+        run: test "v$(poetry version -s)" = "$GITHUB_REF_NAME"
+
       - name: Validate package
         run: |
           poetry check
+          poetry run pytest -m "not integration"
           poetry build
 
       - name: Publish package

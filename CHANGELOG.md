@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.0.13 - 2026-07-17
+
+### Added
+
+- Added trusted-source filtering with repeatable include and exclude domain
+  options across synchronous, asynchronous, CLI, and MCP searches.
+- Added batch search to the command-line interface and MCP server.
+
+### Changed
+
+- Updated package license metadata to the SPDX format.
+- Improved release validation and test isolation without changing runtime
+  defaults or article result shapes.
+
+### Compatibility
+
+- Existing client calls, CLI commands, MCP tools, and article dictionaries are
+  unchanged. All new filters and commands are opt-in.
+
 ## 0.0.12 - 2026-07-09
 
 ### Added

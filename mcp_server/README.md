@@ -5,6 +5,8 @@ This MCP server provides a bridge to the Google News service, offering tools to 
 
 ## Features
 - News article search with flexible filtering options
+- Batch search across multiple queries
+- Included and excluded publisher-domain filters
 - Top news retrieval by topic
 - URL decoding for direct article access
 - Automatic rate limiting (60 requests per minute)
@@ -27,8 +29,15 @@ Parameters:
 - `decode_links`: Whether to decode Google News URLs to publisher URLs (default: `True`)
 - `extract_text`: Whether to fetch decoded URLs and extract article text (default: `True`)
 - `mode`: Search backend: `default`, `searchapi_light`, or `searchapi_portal` (default: `default`)
+- `include_domains`: (Optional) Publisher domains to include
+- `exclude_domains`: (Optional) Publisher domains to exclude
 
-### 2. top_news
+### 2. batch_news_search
+Search several queries with the same parameters. It accepts `queries` plus the
+same filters and enrichment options as `news_search`, and returns a mapping of
+each query to its article list.
+
+### 3. top_news
 Get top news articles for a specific topic.
 
 Parameters:
@@ -41,7 +50,7 @@ Parameters:
 - `mode`: Search backend: `default`, `searchapi_light`, or `searchapi_portal` (default: `default`)
 
 ## Response Format
-Both tools return a list of article dictionaries containing:
+Search and top-news tools return a list of article dictionaries containing:
 - `title`: Article title
 - `link`: Direct article URL (decoded from Google redirect URL)
 - `google_link`: Original Google News URL when URL decoding succeeds
