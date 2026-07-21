@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.0.14 - 2026-07-21
+
+### Added
+
+- Added `google-news --version` for installation checks and bug reports.
+
+### Changed
+
+- Extended CI installation smoke coverage to verify the installed package
+  version and command-line entry point.
+
+### Compatibility
+
+- Existing client calls, CLI commands, MCP tools, defaults, output formats, and
+  article dictionaries are unchanged. The new version option is additive.
+
 ## 0.0.13 - 2026-07-17
 
 ### Added

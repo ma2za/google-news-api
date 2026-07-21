@@ -23,7 +23,9 @@ jobs:
 
       - name: Import package
         run: |
-          python -c "from google_news_api import Article, EnrichedArticle, GoogleNewsClient; print(GoogleNewsClient, Article, EnrichedArticle)"
+          python -c "from google_news_api import Article, EnrichedArticle, GoogleNewsClient, __version__; assert __version__ == '0.0.14'; print(GoogleNewsClient, Article, EnrichedArticle)"
+          test "$(google-news --version)" = "google-news 0.0.14"
+          google-news --help
 
   test:
     name: Python ${{ matrix.python-version }}

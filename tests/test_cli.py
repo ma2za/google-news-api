@@ -3,6 +3,8 @@
 import io
 import json
 
+import pytest
+
 from google_news_api import cli
 
 ARTICLES = [
@@ -58,6 +60,17 @@ def install_fake_client(monkeypatch):
     """Install a no-network client test double."""
     FakeClient.instances = []
     monkeypatch.setattr(cli, "GoogleNewsClient", FakeClient)
+
+
+def test_cli_version_reports_installed_package_version(monkeypatch, capsys):
+    """The global version option reports installed distribution metadata."""
+    monkeypatch.setattr(cli, "__version__", "0.0.14")
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(["--version"])
+
+    assert exc_info.value.code == 0
+    assert capsys.readouterr().out == "google-news 0.0.14\n"
 
 
 def test_cli_search_writes_json_and_passes_filters(monkeypatch):

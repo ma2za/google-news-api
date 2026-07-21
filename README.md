@@ -18,6 +18,12 @@ or richer snippets.
 pip install google-news-api
 ```
 
+Verify the installed command and package version:
+
+```bash
+google-news --version
+```
+
 ## Quickstart
 
 ```python
