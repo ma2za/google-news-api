@@ -6,6 +6,7 @@ import json
 import sys
 from typing import Dict, Iterable, List, Optional, Sequence, TextIO
 
+from . import __version__
 from .client import GoogleNewsClient
 from .exceptions import GoogleNewsError
 from .providers import VALID_SEARCH_MODES
@@ -19,6 +20,11 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="google-news",
         description="Search Google News RSS feeds from the command line.",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 

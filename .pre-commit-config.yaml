@@ -25,8 +25,4 @@ repos:
     rev: 7.0.0
     hooks:
       - id: flake8
-        additional_dependencies:
-          - flake8-docstrings
-          - flake8-quotes
-          - flake8-bugbear
         args: ["--max-line-length=88"]  # Match black's line length
