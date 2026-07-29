@@ -1,0 +1,65 @@
+name: Bug report
+description: Report incorrect library, CLI, URL-decoding, or MCP behavior.
+title: "Bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste API keys, environment files, cookies, or full request headers.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: google-news-api version
+      placeholder: Output of: google-news --version
+    validations:
+      required: true
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      placeholder: 3.13.12
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options:
+        - Python sync client
+        - Python async client
+        - google-news CLI
+        - google-news-mcp
+        - Packaging or installation
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Paste the smallest command or code that reproduces the issue.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Error output
+      description: Remove API keys and private data.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I removed credentials and private data from this report.
+          required: true
+        - label: I verified the problem on the latest release.
+          required: true
