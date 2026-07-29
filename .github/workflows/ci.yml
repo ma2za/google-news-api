@@ -18,14 +18,22 @@ jobs:
         with:
           python-version: "3.9"
 
-      - name: Install package
-        run: python -m pip install .
+      - name: Build wheel
+        run: python -m pip wheel . --wheel-dir dist
 
-      - name: Import package
+      - name: Install wheel
+        run: python -m pip install --force-reinstall dist/google_news_api-*.whl
+
+      - name: Smoke test installed wheel
+        shell: bash
         run: |
-          python -c "from google_news_api import Article, EnrichedArticle, GoogleNewsClient, __version__; assert __version__ == '0.0.14'; print(GoogleNewsClient, Article, EnrichedArticle)"
-          test "$(google-news --version)" = "google-news 0.0.14"
+          smoke_dir="$(mktemp -d)"
+          cd "$smoke_dir"
+          package_version="$(python -c "from importlib.metadata import version; print(version('google-news-api'))")"
+          python -c "from importlib.resources import files; from google_news_api import Article, EnrichedArticle, GoogleNewsClient; import google_news_api.mcp_server; assert files('google_news_api').joinpath('py.typed').is_file(); print(GoogleNewsClient, Article, EnrichedArticle)"
+          test "$(google-news --version)" = "google-news $package_version"
           google-news --help
+          python -m pip check
 
   test:
     name: Python ${{ matrix.python-version }}
@@ -59,4 +67,4 @@ jobs:
           poetry run flake8 google_news_api tests examples mcp_server
 
       - name: Test
-        run: poetry run pytest
+        run: poetry run pytest -m "not integration"

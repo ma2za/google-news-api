@@ -37,5 +37,37 @@ jobs:
           poetry run pytest -m "not integration"
           poetry build
 
+      - name: Smoke test built artifacts
+        shell: bash
+        run: |
+          wheel_path="$(find dist -maxdepth 1 -name 'google_news_api-*.whl' -print -quit)"
+          sdist_path="$(find dist -maxdepth 1 -name 'google_news_api-*.tar.gz' -print -quit)"
+
+          python -m venv "$RUNNER_TEMP/wheel-smoke"
+          "$RUNNER_TEMP/wheel-smoke/bin/python" -m pip install "$wheel_path"
+          (
+            cd "$RUNNER_TEMP"
+            package_version="$("$RUNNER_TEMP/wheel-smoke/bin/python" -c "from importlib.metadata import version; print(version('google-news-api'))")"
+            "$RUNNER_TEMP/wheel-smoke/bin/python" -c "from importlib.resources import files; from google_news_api import Article, EnrichedArticle, GoogleNewsClient; import google_news_api.mcp_server; assert files('google_news_api').joinpath('py.typed').is_file(); print(GoogleNewsClient, Article, EnrichedArticle)"
+            test "$("$RUNNER_TEMP/wheel-smoke/bin/google-news" --version)" = "google-news $package_version"
+            "$RUNNER_TEMP/wheel-smoke/bin/google-news" --help
+            "$RUNNER_TEMP/wheel-smoke/bin/python" -m pip check
+          )
+
+          python -m venv "$RUNNER_TEMP/sdist-smoke"
+          "$RUNNER_TEMP/sdist-smoke/bin/python" -m pip install "$sdist_path"
+          (
+            cd "$RUNNER_TEMP"
+            "$RUNNER_TEMP/sdist-smoke/bin/python" -c "from google_news_api import GoogleNewsClient, __version__; print(GoogleNewsClient, __version__)"
+            "$RUNNER_TEMP/sdist-smoke/bin/python" -m pip check
+          )
+
+          "$RUNNER_TEMP/wheel-smoke/bin/python" -m pip install "${wheel_path}[mcp]"
+          (
+            cd "$RUNNER_TEMP"
+            "$RUNNER_TEMP/wheel-smoke/bin/python" -c "from google_news_api.mcp_server import create_mcp_app; create_mcp_app()"
+            "$RUNNER_TEMP/wheel-smoke/bin/python" -m pip check
+          )
+
       - name: Publish package
         uses: pypa/gh-action-pypi-publish@release/v1
