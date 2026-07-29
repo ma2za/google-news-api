@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest a focused Python, CLI, RSS, or MCP improvement.
+title: "Feature: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What are you trying to accomplish?
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-api
+    attributes:
+      label: Proposed API or CLI
+      description: Show the Python, command-line, or MCP interface you would use.
+      render: python
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: What are you using now?

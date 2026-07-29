@@ -7,16 +7,20 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   install-smoke:
     name: Python 3.9 install smoke
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.9"
+          cache: pip
 
       - name: Build wheel
         run: python -m pip wheel . --wheel-dir dist
@@ -46,19 +50,21 @@ jobs:
           - "3.11"
           - "3.12"
           - "3.13"
+          - "3.14"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
       - name: Install Poetry
-        run: python -m pip install poetry
+        run: python -m pip install poetry==2.3.2
 
       - name: Install dependencies
-        run: poetry install --with dev
+        run: poetry install --with dev --all-extras
 
       - name: Lint
         run: |
@@ -67,4 +73,62 @@ jobs:
           poetry run flake8 google_news_api tests examples mcp_server
 
       - name: Test
-        run: poetry run pytest -m "not integration"
+        run: poetry run pytest -m "not integration" --strict-markers
+
+  package:
+    name: Package validation
+    needs:
+      - install-smoke
+      - test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install release tools
+        run: python -m pip install poetry==2.3.2 twine==6.2.0
+
+      - name: Verify test collection
+        run: |
+          poetry install --with dev --all-extras
+          poetry run pytest --collect-only -q --strict-markers
+
+      - name: Build and validate distributions
+        run: |
+          poetry check
+          poetry build
+          python -m twine check dist/*
+
+      - name: Smoke test base wheel installation
+        run: |
+          wheel_path="$(find dist -name 'google_news_api-*.whl' -print -quit)"
+          python -m venv /tmp/google-news-api-base
+          /tmp/google-news-api-base/bin/pip install "$wheel_path"
+          /tmp/google-news-api-base/bin/pip check
+          (
+            cd /tmp
+            package_version="$(/tmp/google-news-api-base/bin/python -c "from importlib.metadata import version; print(version('google-news-api'))")"
+            /tmp/google-news-api-base/bin/python -c "from importlib import metadata; from importlib.resources import files; import importlib.util; from google_news_api import __version__; expected={'google-news':'google_news_api.cli:main','google-news-mcp':'google_news_api.mcp_server:main'}; actual={entry.name:entry.value for entry in metadata.entry_points(group='console_scripts') if entry.name in expected}; package=metadata.metadata('google-news-api'); assert actual == expected; assert metadata.version('google-news-api') == __version__; assert package['Requires-Python'] == '>=3.9'; assert package.get_all('Provides-Extra') == ['mcp']; assert files('google_news_api').joinpath('py.typed').is_file(); assert importlib.util.find_spec('mcp') is None"
+            test "$(/tmp/google-news-api-base/bin/google-news --version)" = "google-news $package_version"
+          )
+
+      - name: Smoke test MCP wheel installation
+        run: |
+          wheel_path="$(find dist -name 'google_news_api-*.whl' -print -quit)"
+          python -m venv /tmp/google-news-api-mcp
+          /tmp/google-news-api-mcp/bin/pip install "${wheel_path}[mcp]"
+          /tmp/google-news-api-mcp/bin/pip check
+          (
+            cd /tmp
+            /tmp/google-news-api-mcp/bin/python -c "from google_news_api.mcp_server import create_mcp_app; create_mcp_app()"
+          )
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: google-news-api-distributions
+          path: dist/
+          if-no-files-found: error

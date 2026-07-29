@@ -320,8 +320,8 @@ parameters, HTTP failures, rate limits, and feed parsing failures.
 ```bash
 git clone https://github.com/ma2za/google-news-api.git
 cd google-news-api
-poetry install --with dev
-pre-commit install
+poetry install --with dev --all-extras
+poetry run pre-commit install
 ```
 
 Run the same checks as the GitHub Actions workflow before opening a pull
@@ -331,24 +331,27 @@ request:
 poetry run black --check google_news_api tests examples mcp_server
 poetry run isort --check-only google_news_api tests examples mcp_server
 poetry run flake8 google_news_api tests examples mcp_server
-poetry run pytest
+poetry run pytest -m "not integration" --strict-markers
 ```
 
 The default test command skips tests that make live network calls. To include
 live Google News integration tests:
 
 ```bash
-poetry run pytest --run-integration
+poetry run pytest -m integration --run-integration --strict-markers
 ```
 
 ## Contributing
 
-1. Fork the repository.
-2. Create a branch.
-3. Make the smallest useful change.
-4. Run the same checks as CI.
-5. Open a pull request with the behavior change and test coverage clearly
-   described.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, offline and live validation,
+and pull request requirements.
+
+Public compatibility commitments are documented in
+[docs/compatibility.md](docs/compatibility.md). Maintainer release ordering is
+documented in [docs/releasing.md](docs/releasing.md).
+
+Security vulnerabilities should be reported through the private process in
+[SECURITY.md](SECURITY.md), not through a public issue.
 
 ## Support The Project
 
