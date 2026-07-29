@@ -2,8 +2,12 @@
 
 import argparse
 import csv
+import io
 import json
+import os
 import sys
+import tempfile
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, TextIO
 
 from . import __version__
@@ -63,6 +67,8 @@ def _add_common_options(parser: argparse.ArgumentParser) -> None:
         dest="output_format",
     )
     parser.add_argument("--decode-links", action="store_true")
+    parser.add_argument("--output")
+    parser.add_argument("--force", action="store_true")
 
 
 def _add_domain_options(parser: argparse.ArgumentParser) -> None:
@@ -207,6 +213,38 @@ def _run(args: argparse.Namespace, output: TextIO) -> None:
         _write_articles(articles, args.output_format, output)
 
 
+def _write_output_file(path: Path, content: str, force: bool) -> None:
+    if force:
+        temporary_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                newline="",
+                dir=path.parent,
+                prefix=f".{path.name}.",
+                delete=False,
+            ) as output:
+                temporary_path = Path(output.name)
+                output.write(content)
+            os.replace(temporary_path, path)
+        except OSError:
+            if temporary_path is not None and temporary_path.exists():
+                temporary_path.unlink()
+            raise
+        return
+
+    created = False
+    try:
+        with path.open("x", encoding="utf-8", newline="") as output:
+            created = True
+            output.write(content)
+    except OSError:
+        if created and path.exists():
+            path.unlink()
+        raise
+
+
 def main(
     argv: Optional[Sequence[str]] = None,
     output: TextIO = sys.stdout,
@@ -215,8 +253,27 @@ def main(
     parser = _parser()
     args = parser.parse_args(argv)
     try:
-        _run(args, output)
+        if args.output is None or args.output == "-":
+            _run(args, output)
+        else:
+            output_path = Path(args.output)
+            if output_path.exists() and not args.force:
+                print(
+                    f"google-news: output file already exists: {output_path}",
+                    file=error,
+                )
+                return 1
+
+            buffered_output = io.StringIO(newline="")
+            _run(args, buffered_output)
+            _write_output_file(output_path, buffered_output.getvalue(), args.force)
     except GoogleNewsError as e:
+        print(f"google-news: {e}", file=error)
+        return 1
+    except FileExistsError:
+        print(f"google-news: output file already exists: {args.output}", file=error)
+        return 1
+    except OSError as e:
         print(f"google-news: {e}", file=error)
         return 1
     return 0

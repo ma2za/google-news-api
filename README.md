@@ -73,6 +73,18 @@ google-news search "python" --format json
 google-news top --topic TECHNOLOGY --max-results 10 --format csv
 ```
 
+Write any command directly to a UTF-8 file:
+
+```bash
+google-news search "python" --format json --output python-news.json
+google-news batch "AI regulation" "semiconductors" \
+  --format csv \
+  --output research.csv
+```
+
+Existing files are protected by default. Pass `--force` to replace one, or use
+`--output -` to write explicitly to standard output.
+
 Decode Google News RSS links to publisher URLs when exporting:
 
 ```bash

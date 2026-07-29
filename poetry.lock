@@ -3315,4 +3315,4 @@ mcp = ["aiohttp", "mcp", "trafilatura"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9"
-content-hash = "1334818fffa542a7801a0c6be5ad9500322caa068c96a2b487104c7ec70b1a06"
+content-hash = "92f92bae3839177681c61eb2461db43125b9c21828ec7425e90a86332c882d14"
