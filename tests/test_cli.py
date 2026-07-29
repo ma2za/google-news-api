@@ -6,6 +6,7 @@ import json
 import pytest
 
 from google_news_api import cli
+from google_news_api.exceptions import ValidationError
 
 ARTICLES = [
     {
@@ -64,13 +65,13 @@ def install_fake_client(monkeypatch):
 
 def test_cli_version_reports_installed_package_version(monkeypatch, capsys):
     """The global version option reports installed distribution metadata."""
-    monkeypatch.setattr(cli, "__version__", "0.0.14")
+    monkeypatch.setattr(cli, "__version__", "1.2.3")
 
     with pytest.raises(SystemExit) as exc_info:
         cli.main(["--version"])
 
     assert exc_info.value.code == 0
-    assert capsys.readouterr().out == "google-news 0.0.14\n"
+    assert capsys.readouterr().out == "google-news 1.2.3\n"
 
 
 def test_cli_search_writes_json_and_passes_filters(monkeypatch):
@@ -260,3 +261,160 @@ def test_cli_batch_decodes_each_result_group(monkeypatch):
     assert len(client.decode_calls) == 2
     assert results["python"][0]["google_link"].startswith("https://news.google.com/")
     assert results["rust"][0]["link"] == "https://example.com/python"
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["search", "python"],
+        ["batch", "python", "rust"],
+        ["top"],
+    ],
+)
+def test_cli_commands_write_json_to_output_file(monkeypatch, tmp_path, arguments):
+    install_fake_client(monkeypatch)
+    output_path = tmp_path / "articles.json"
+
+    exit_code = cli.main([*arguments, "--format", "json", "--output", str(output_path)])
+
+    assert exit_code == 0
+    assert output_path.read_text(encoding="utf-8").endswith("\n")
+    assert json.loads(output_path.read_text(encoding="utf-8"))
+
+
+def test_cli_output_dash_preserves_stdout_behavior(monkeypatch):
+    install_fake_client(monkeypatch)
+    output = io.StringIO()
+
+    exit_code = cli.main(
+        ["search", "python", "--format", "json", "--output", "-"],
+        output=output,
+    )
+
+    assert exit_code == 0
+    assert json.loads(output.getvalue()) == ARTICLES
+
+
+def test_cli_refuses_to_overwrite_existing_output(monkeypatch, tmp_path):
+    install_fake_client(monkeypatch)
+    output_path = tmp_path / "articles.json"
+    output_path.write_text("keep me", encoding="utf-8")
+    error = io.StringIO()
+
+    exit_code = cli.main(
+        ["search", "python", "--output", str(output_path)],
+        error=error,
+    )
+
+    assert exit_code == 1
+    assert output_path.read_text(encoding="utf-8") == "keep me"
+    assert (
+        error.getvalue() == f"google-news: output file already exists: {output_path}\n"
+    )
+    assert FakeClient.instances == []
+
+
+def test_cli_force_replaces_existing_output(monkeypatch, tmp_path):
+    install_fake_client(monkeypatch)
+    output_path = tmp_path / "articles.json"
+    output_path.write_text("old content", encoding="utf-8")
+
+    exit_code = cli.main(
+        [
+            "search",
+            "python",
+            "--format",
+            "json",
+            "--output",
+            str(output_path),
+            "--force",
+        ]
+    )
+
+    assert exit_code == 0
+    assert json.loads(output_path.read_text(encoding="utf-8")) == ARTICLES
+    assert not list(tmp_path.glob(".articles.json.*"))
+
+
+def test_cli_force_failure_preserves_existing_output(monkeypatch, tmp_path):
+    install_fake_client(monkeypatch)
+    output_path = tmp_path / "articles.json"
+    output_path.write_text("old content", encoding="utf-8")
+    error = io.StringIO()
+
+    def fail_replace(_source, _destination):
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(cli.os, "replace", fail_replace)
+
+    exit_code = cli.main(
+        [
+            "search",
+            "python",
+            "--output",
+            str(output_path),
+            "--force",
+        ],
+        error=error,
+    )
+
+    assert exit_code == 1
+    assert output_path.read_text(encoding="utf-8") == "old content"
+    assert not list(tmp_path.glob(".articles.json.*"))
+    assert error.getvalue() == "google-news: replace failed\n"
+
+
+def test_cli_failed_command_does_not_create_output(monkeypatch, tmp_path):
+    output_path = tmp_path / "articles.json"
+    error = io.StringIO()
+
+    def fail(_args, _output):
+        raise ValidationError("invalid query")
+
+    monkeypatch.setattr(cli, "_run", fail)
+
+    exit_code = cli.main(
+        ["search", "python", "--output", str(output_path)],
+        error=error,
+    )
+
+    assert exit_code == 1
+    assert not output_path.exists()
+    assert error.getvalue() == "google-news: invalid query\n"
+
+
+def test_cli_output_file_uses_utf8_and_valid_csv(monkeypatch, tmp_path):
+    install_fake_client(monkeypatch)
+    output_path = tmp_path / "articles.csv"
+    monkeypatch.setitem(ARTICLES[0], "title", "Știri Python")
+
+    exit_code = cli.main(
+        [
+            "search",
+            "python",
+            "--format",
+            "csv",
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    assert exit_code == 0
+    content = output_path.read_bytes()
+    assert "Știri Python".encode() in content
+    assert b"\r\r\n" not in content
+
+
+def test_cli_output_reports_filesystem_error(monkeypatch, tmp_path):
+    install_fake_client(monkeypatch)
+    output_path = tmp_path / "missing" / "articles.json"
+    error = io.StringIO()
+
+    exit_code = cli.main(
+        ["search", "python", "--output", str(output_path)],
+        error=error,
+    )
+
+    assert exit_code == 1
+    assert not output_path.exists()
+    assert error.getvalue().startswith("google-news: ")

@@ -88,6 +88,7 @@ def test_client_invalid_topic():
     assert "Invalid topic" in str(exc_info.value)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_get_top_news():
     """Test getting top news articles."""
@@ -107,6 +108,7 @@ async def test_get_top_news():
         assert all("summary" in article for article in news)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_get_topic_news():
     """Test getting topic-specific news."""
@@ -126,6 +128,7 @@ async def test_get_topic_news():
         assert all("summary" in article for article in news)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_search():
     """Test searching for news articles."""
@@ -143,6 +146,7 @@ async def test_search():
         assert all("summary" in article for article in news)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_search_with_dates():
     """Test searching with dates."""
@@ -158,6 +162,7 @@ async def test_search_with_dates():
             # Could add date parsing validation here if needed
 
 
+@pytest.mark.integration
 def test_search_with_date_range():
     """Test searching with date range parameters."""
     client = GoogleNewsClient()
@@ -172,6 +177,7 @@ def test_search_with_date_range():
     assert len(news) <= 5
 
 
+@pytest.mark.integration
 def test_search_with_date_range_content():
     """Test that articles from date range search fall within the specified range."""
     client = GoogleNewsClient()
@@ -222,6 +228,7 @@ def test_search_with_date_range_validation():
     assert "must be a valid date in YYYY-MM-DD format" in str(exc_info.value)
 
 
+@pytest.mark.integration
 def test_search_with_relative_time():
     """Test searching with relative time parameters."""
     client = GoogleNewsClient()
@@ -237,6 +244,7 @@ def test_search_with_relative_time():
         assert len(news) <= 5
 
 
+@pytest.mark.integration
 def test_search_with_relative_time_content():
     """Test that articles from relative time search fall within the specified range."""
     client = GoogleNewsClient()
@@ -288,6 +296,7 @@ def test_search_with_relative_time_validation():
     assert "must be in format: <number>[h|d]" in str(exc_info.value)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_async_search_with_time_parameters():
     """Test time-based search parameters with async client."""
@@ -302,6 +311,7 @@ async def test_async_search_with_time_parameters():
         assert len(news) <= 5
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_async_search_with_time_parameters_content():
     """Test content of time-based search results with async client."""
@@ -370,6 +380,7 @@ async def test_async_search_with_time_parameters_validation():
         assert "Cannot use 'when' parameter together with" in str(exc_info.value)
 
 
+@pytest.mark.integration
 def test_sync_client_search():
     """Test synchronous client search."""
     client = GoogleNewsClient()
@@ -386,6 +397,7 @@ def test_sync_client_search():
     assert all("summary" in article for article in news)
 
 
+@pytest.mark.integration
 def test_sync_client_top_news():
     """Test synchronous client top news."""
     client = GoogleNewsClient()
@@ -423,6 +435,7 @@ async def test_async_client_cleanup():
     await client.aclose()  # Should close without errors
 
 
+@pytest.mark.integration
 def test_max_results_validation():
     """Test that max_results is properly handled."""
     client = GoogleNewsClient()
@@ -1031,6 +1044,7 @@ def test_searchapi_normalize_negative_max_results_returns_all():
     assert provider._normalize_articles(articles, max_results=0) == []
 
 
+@pytest.mark.integration
 def test_batch_search():
     """Test synchronous batch search functionality."""
     client = GoogleNewsClient()
@@ -1055,6 +1069,7 @@ def test_batch_search():
             )
 
 
+@pytest.mark.integration
 def test_batch_search_with_time_params():
     """Test synchronous batch search with time parameters."""
     client = GoogleNewsClient()
@@ -1120,6 +1135,7 @@ def test_batch_search_validation():
     assert "Cannot use 'when' parameter together with" in str(exc_info.value)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_async_batch_search():
     """Test asynchronous batch search functionality."""
@@ -1145,6 +1161,7 @@ async def test_async_batch_search():
                 )
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_async_batch_search_with_time_params():
     """Test asynchronous batch search with time parameters."""
@@ -1213,6 +1230,7 @@ async def test_async_batch_search_validation():
         assert "Cannot use 'when' parameter together with" in str(exc_info.value)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_async_batch_search_error_handling():
     """Test error handling in asynchronous batch search."""
@@ -1232,6 +1250,7 @@ async def test_async_batch_search_error_handling():
         assert results[""] == []
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_decode_url():
     """Test decoding a single Google News URL."""
@@ -1264,6 +1283,7 @@ async def test_decode_url():
         assert "Invalid Google News URL format" in str(exc_info.value)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_decode_urls():
     """Test batch decoding of multiple Google News URLs."""
@@ -1320,6 +1340,7 @@ async def test_decode_urls():
         assert decoded_mixed[2] is None or decoded_mixed[2] == ""
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_decode_urls_concurrency():
     """Test concurrent URL decoding with different concurrency limits."""
@@ -1682,6 +1703,7 @@ async def test_async_batch_search_forwards_normalized_domain_filters(monkeypatch
     )
 
 
+@pytest.mark.integration
 def test_search_with_domain_filter():
     with GoogleNewsClient() as client:
         articles = client.search(
