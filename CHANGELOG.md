@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.0.15 - 2026-07-29
+
+### Added
+
+- Added `--output PATH` to the `search`, `batch`, and `top` commands for direct
+  UTF-8 file output.
+- Added `--force` for explicit replacement of existing output files.
+- Added public API contract tests for client signatures, exports, and the base
+  article dictionary shape.
+
+### Changed
+
+- Release validation now smoke-tests installed wheel and source artifacts,
+  including package entry points and optional MCP installation.
+- Live-network tests now use explicit integration markers instead of a
+  function-name allowlist.
+- CI version checks now read installed package metadata instead of hardcoding a
+  release number.
+
+### Fixed
+
+- Constrained the optional MCP dependency to the compatible 1.x series so a
+  fresh `google-news-api[mcp]` installation cannot select the incompatible MCP
+  2.x API.
+
+### Compatibility
+
+- Existing client calls, CLI commands, MCP tools, defaults, stdout output, and
+  article dictionaries are unchanged. File output is opt-in, and existing files
+  are never replaced without `--force`.
+
 ## 0.0.14 - 2026-07-21
 
 ### Added
