@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.0.16 - 2026-08-11
+
+### Added
+
+- Added Python 3.14 to the tested compatibility matrix.
+- Added contributor, security, compatibility, release, and structured issue
+  guidance.
+
+### Changed
+
+- Expanded CI and publishing validation for built artifacts, package metadata,
+  console entry points, optional MCP installation, and test collection.
+- Pinned release tooling and updated the GitHub Actions toolchain.
+- Updated the optional MCP development lock to `cryptography` 50.0.0.
+
+### Compatibility
+
+- Runtime APIs, CLI commands, MCP tools, defaults, output formats, and article
+  dictionaries are unchanged.
+
 ## 0.0.15 - 2026-07-29
 
 ### Added
