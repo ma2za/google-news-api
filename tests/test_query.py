@@ -38,8 +38,12 @@ def test_news_query_combined():
         exclude_words=["robot", "sci-fi movie"],
         in_title="breakthrough",
     ).build()
-    
-    assert query == 'machine learning "neural networks" (AI OR "deep learning") -robot -"sci-fi movie" intitle:"breakthrough"'
+
+    expected = (
+        'machine learning "neural networks" (AI OR "deep learning") '
+        '-robot -"sci-fi movie" intitle:"breakthrough"'
+    )
+    assert query == expected
 
 
 def test_news_query_escaping():
@@ -47,7 +51,7 @@ def test_news_query_escaping():
         exact_phrase='quote " test \\ backslash',
         exclude_words=['another " quote'],
     ).build()
-    
+
     assert query == '"quote \\" test \\\\ backslash" -"another \\" quote"'
 
 
@@ -58,7 +62,7 @@ def test_news_query_strips_and_cleans():
         any_words=["", "  ", "rust", "rust", "go"],
         exclude_words=[None, "java", "java  ", " c "],
     ).build()
-    
+
     assert query == 'python (rust OR go) -java -c'
 
 

@@ -21,7 +21,7 @@ def _clean_list(items: Optional[List[str]]) -> List[str]:
     """Strip items, remove empty items, and preserve order while removing duplicates."""
     if not items:
         return []
-    
+
     cleaned = []
     seen = set()
     for item in items:
@@ -36,7 +36,7 @@ def _clean_list(items: Optional[List[str]]) -> List[str]:
 
 class NewsQuery:
     """Immutable builder for Google News search queries.
-    
+
     This helps safely construct advanced search queries using exact phrases,
     any-word matching, exclusions, and title targeting.
     """
@@ -51,20 +51,23 @@ class NewsQuery:
         in_title: Optional[str] = None,
     ):
         self.text = text.strip() if isinstance(text, str) else ""
-        self.exact_phrase = exact_phrase.strip() if isinstance(exact_phrase, str) else None
+        self.exact_phrase = (
+            exact_phrase.strip() if isinstance(exact_phrase, str) else None
+        )
         if self.exact_phrase == "":
             self.exact_phrase = None
-            
+
         self.any_words = tuple(_clean_list(any_words))
         self.exclude_words = tuple(_clean_list(exclude_words))
-        
+
         self.in_title = in_title.strip() if isinstance(in_title, str) else None
         if self.in_title == "":
             self.in_title = None
 
         if not any([self.text, self.exact_phrase, self.any_words, self.in_title]):
             raise ValidationError(
-                "At least one positive term (text, exact_phrase, any_words, or in_title) is required.",
+                "At least one positive term (text, exact_phrase, any_words, or "
+                "in_title) is required.",
                 field="query",
                 value="",
             )
@@ -72,27 +75,29 @@ class NewsQuery:
     def build(self) -> str:
         """Build the final search query string."""
         parts = []
-        
+
         if self.text:
             parts.append(self.text)
-            
+
         if self.exact_phrase:
             escaped = _escape(self.exact_phrase)
             parts.append(f'"{escaped}"')
-            
+
         if self.any_words:
             escaped_words = [_quote_term(_escape(word)) for word in self.any_words]
             parts.append(f"({' OR '.join(escaped_words)})")
-            
+
         if self.exclude_words:
-            escaped_excludes = [_quote_term(_escape(word)) for word in self.exclude_words]
+            escaped_excludes = [
+                _quote_term(_escape(word)) for word in self.exclude_words
+            ]
             for word in escaped_excludes:
                 parts.append(f"-{word}")
-                
+
         if self.in_title:
             escaped = _escape(self.in_title)
             parts.append(f'intitle:"{escaped}"')
-            
+
         return " ".join(parts)
 
     def __str__(self) -> str:
