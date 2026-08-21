@@ -20,6 +20,26 @@ OUTPUT_FIELDS = ("title", "source", "published", "link")
 CSV_FIELDS = ("title", "source", "published", "link", "summary", "id", "google_link")
 
 
+def _add_query_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--exact-phrase", help="Match this exact phrase")
+    parser.add_argument(
+        "--any-word",
+        action="append",
+        help="Match at least one of these words (can be used multiple times)",
+    )
+    parser.add_argument(
+        "--exclude-word",
+        action="append",
+        help="Exclude articles containing this word (can be used multiple times)",
+    )
+    parser.add_argument("--in-title", help="Ensure this text appears in the title")
+    parser.add_argument(
+        "--show-query",
+        action="store_true",
+        help="Print the generated query to stderr before running",
+    )
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="google-news",
@@ -39,6 +59,7 @@ def _parser() -> argparse.ArgumentParser:
     search.add_argument("--before")
     search.add_argument("--when")
     _add_domain_options(search)
+    _add_query_options(search)
 
     batch = subparsers.add_parser("batch", help="Search several news queries")
     batch.add_argument("queries", nargs="+")
@@ -47,10 +68,19 @@ def _parser() -> argparse.ArgumentParser:
     batch.add_argument("--before")
     batch.add_argument("--when")
     _add_domain_options(batch)
+    _add_query_options(batch)
 
     top = subparsers.add_parser("top", help="Fetch top news by topic")
     top.add_argument("--topic", default="WORLD")
     _add_common_options(top)
+
+    location = subparsers.add_parser(
+        "location", help="Fetch news for a geographic location"
+    )
+    location.add_argument(
+        "location", help="City, region, or country (e.g. 'New York', 'Bucharest')"
+    )
+    _add_common_options(location)
 
     return parser
 
@@ -170,10 +200,23 @@ def _write_batch_articles(
 
 
 def _run(args: argparse.Namespace, output: TextIO) -> None:
+    from google_news_api.query import NewsQuery
+
     with GoogleNewsClient(language=args.language, country=args.country) as client:
         if args.command == "search":
+            query = NewsQuery(
+                text=args.query,
+                exact_phrase=getattr(args, "exact_phrase", None),
+                any_words=getattr(args, "any_word", None),
+                exclude_words=getattr(args, "exclude_word", None),
+                in_title=getattr(args, "in_title", None),
+            ).build()
+
+            if getattr(args, "show_query", False):
+                print(query, file=sys.stderr)
+
             articles = client.search(
-                args.query,
+                query,
                 after=args.after,
                 before=args.before,
                 when=args.when,
@@ -183,8 +226,23 @@ def _run(args: argparse.Namespace, output: TextIO) -> None:
                 exclude_domains=args.exclude_domains,
             )
         elif args.command == "batch":
+            queries = [
+                NewsQuery(
+                    text=q,
+                    exact_phrase=getattr(args, "exact_phrase", None),
+                    any_words=getattr(args, "any_word", None),
+                    exclude_words=getattr(args, "exclude_word", None),
+                    in_title=getattr(args, "in_title", None),
+                ).build()
+                for q in args.queries
+            ]
+
+            if getattr(args, "show_query", False):
+                for q in queries:
+                    print(q, file=sys.stderr)
+
             results = client.batch_search(
-                args.queries,
+                queries,
                 after=args.after,
                 before=args.before,
                 when=args.when,
@@ -200,6 +258,11 @@ def _run(args: argparse.Namespace, output: TextIO) -> None:
                 }
             _write_batch_articles(results, args.output_format, output)
             return
+        elif args.command == "location":
+            articles = client.location_news(
+                location=args.location,
+                max_results=args.max_results,
+            )
         else:
             articles = client.top_news(
                 topic=args.topic,

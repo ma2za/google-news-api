@@ -13,6 +13,7 @@ from .exceptions import (
     ValidationError,
 )
 from .logging import setup_logging
+from .query import NewsQuery
 from .types import Article, EnrichedArticle
 from .utils import AsyncCache, AsyncRateLimiter, Cache, RateLimiter
 
@@ -28,6 +29,7 @@ __all__ = [
     "AsyncGoogleNewsClient",
     "GoogleNewsClient",
     "ClientConfig",
+    "NewsQuery",
     "ConfigurationError",
     "GoogleNewsError",
     "HTTPError",

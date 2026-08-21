@@ -47,6 +47,10 @@ class FakeClient:
         self.top_news_kwargs = kwargs
         return [dict(article) for article in ARTICLES]
 
+    def location_news(self, **kwargs):
+        self.location_news_kwargs = kwargs
+        return [dict(article) for article in ARTICLES]
+
     def batch_search(self, queries, **kwargs):
         self.batch_queries = queries
         self.batch_search_kwargs = kwargs
@@ -144,6 +148,31 @@ def test_cli_top_writes_csv(monkeypatch):
     assert "Python News,Example,2026-07-09" in output.getvalue()
 
 
+def test_cli_location_writes_json(monkeypatch):
+    """The location command writes JSON output."""
+    install_fake_client(monkeypatch)
+    output = io.StringIO()
+
+    exit_code = cli.main(
+        [
+            "location",
+            "Chicago",
+            "--max-results",
+            "1",
+            "--format",
+            "json",
+        ],
+        output=output,
+    )
+
+    assert exit_code == 0
+    assert FakeClient.instances[0].location_news_kwargs == {
+        "location": "Chicago",
+        "max_results": 1,
+    }
+    assert "Python News" in output.getvalue()
+
+
 def test_cli_table_output_is_default(monkeypatch):
     """Table output is the default format."""
     install_fake_client(monkeypatch)
@@ -201,6 +230,41 @@ def test_cli_search_passes_domain_filters(monkeypatch):
         "apnews.com",
     ]
     assert FakeClient.instances[0].search_kwargs["exclude_domains"] == ["youtube.com"]
+
+
+def test_cli_search_uses_news_query_builder(monkeypatch, capsys):
+    """The search command builds a NewsQuery and optionally prints it."""
+    install_fake_client(monkeypatch)
+    output = io.StringIO()
+
+    exit_code = cli.main(
+        [
+            "search",
+            "python",
+            "--exact-phrase",
+            "programming language",
+            "--any-word",
+            "rust",
+            "--any-word",
+            "go",
+            "--exclude-word",
+            "java",
+            "--in-title",
+            "tutorial",
+            "--show-query",
+            "--format",
+            "json",
+        ],
+        output=output,
+    )
+
+    assert exit_code == 0
+    client = FakeClient.instances[0]
+    expected_query = (
+        'python "programming language" (rust OR go) -java intitle:"tutorial"'
+    )
+    assert client.search_query == expected_query
+    assert expected_query in capsys.readouterr().err
 
 
 def test_cli_batch_writes_grouped_json(monkeypatch):

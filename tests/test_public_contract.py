@@ -30,6 +30,7 @@ def test_public_exports_are_stable():
         "GoogleNewsClient",
         "GoogleNewsError",
         "HTTPError",
+        "NewsQuery",
         "ParsingError",
         "RateLimitError",
         "RateLimiter",
@@ -77,6 +78,17 @@ def test_top_news_contract_is_stable():
 
     assert _parameters(GoogleNewsClient.top_news) == expected
     assert _parameters(AsyncGoogleNewsClient.top_news) == expected
+
+
+def test_location_news_contract_is_stable():
+    expected = (
+        ("self", "POSITIONAL_OR_KEYWORD", inspect.Parameter.empty),
+        ("location", "POSITIONAL_OR_KEYWORD", inspect.Parameter.empty),
+        ("max_results", "KEYWORD_ONLY", None),
+    )
+
+    assert _parameters(GoogleNewsClient.location_news) == expected
+    assert _parameters(AsyncGoogleNewsClient.location_news) == expected
 
 
 def test_batch_search_contract_is_stable():

@@ -181,3 +181,4 @@ cython_debug/
 # Gemini
 .gemini/
 GEMINI.md
+.tmp/
