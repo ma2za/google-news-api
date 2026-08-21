@@ -116,6 +116,10 @@ class SearchAPIProvider:
             "engine": engine,
             "q": query,
             "api_key": self._api_key(),
+            "utm_source": "Github",
+            "utm_medium": "sponsorship",
+            "utm_campaign": "google_news_api",
+            "utm_content": "ma2za/google-news-api",
         }
 
         if mode == SEARCHAPI_LIGHT_MODE:
