@@ -66,6 +66,18 @@ class FakeClient:
             }
         ]
 
+    async def location_news(self, **kwargs):
+        self.location_news_kwargs = kwargs
+        return [
+            {
+                "title": "Top",
+                "link": "https://news.google.com/rss/articles/top",
+                "published": "2026-01-01",
+                "summary": "",
+                "source": "Example",
+            }
+        ]
+
     async def batch_search(self, **kwargs):
         self.batch_search_kwargs = kwargs
         return {
@@ -266,7 +278,12 @@ def test_mcp_app_registers_batch_search(monkeypatch):
     app = mcp_server.create_mcp_app()
 
     assert app.name == "googlenews"
-    assert registered == ["news_search", "batch_news_search", "top_news"]
+    assert registered == [
+        "news_search",
+        "batch_news_search",
+        "top_news",
+        "location_news",
+    ]
 
 
 @pytest.mark.asyncio
@@ -290,6 +307,27 @@ async def test_mcp_top_news_passes_mode(monkeypatch):
     assert client.top_news_kwargs["topic"] == "TECHNOLOGY"
     assert client.top_news_kwargs["max_results"] == 2
     assert client.top_news_kwargs["mode"] == "searchapi_portal"
+
+
+@pytest.mark.asyncio
+async def test_mcp_location_news(monkeypatch):
+    client = FakeClient()
+
+    async def get_client(language="en", country="US"):
+        return client
+
+    monkeypatch.setattr(mcp_server, "get_client", get_client)
+
+    result = await mcp_server.location_news(
+        location="Chicago",
+        max_results=2,
+        decode_links=False,
+        extract_text=False,
+    )
+
+    assert result[0]["title"] == "Top"
+    assert client.location_news_kwargs["location"] == "Chicago"
+    assert client.location_news_kwargs["max_results"] == 2
 
 
 def test_mcp_server_entrypoint_reports_missing_extra(monkeypatch, capsys):

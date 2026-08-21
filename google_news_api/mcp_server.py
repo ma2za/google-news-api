@@ -217,12 +217,37 @@ async def top_news(
         return [{"error": f"Failed to fetch top news: {str(e)}"}]
 
 
+async def location_news(
+    location: str,
+    max_results: Optional[int] = None,
+    language: str = "en",
+    country: str = "US",
+    decode_links: bool = True,
+    extract_text: bool = True,
+) -> List[dict[str, Any]]:
+    client = await get_client(language, country)
+    try:
+        articles = await client.location_news(
+            location=location,
+            max_results=max_results,
+        )
+        return await _enrich_articles(
+            client,
+            articles,
+            decode_links=decode_links,
+            extract_text=extract_text,
+        )
+    except Exception as e:
+        return [{"error": f"Failed to fetch location news: {str(e)}"}]
+
+
 def create_mcp_app():
     FastMCP = _load_fastmcp()
     mcp = FastMCP("googlenews")
     mcp.tool()(news_search)
     mcp.tool()(batch_news_search)
     mcp.tool()(top_news)
+    mcp.tool()(location_news)
     return mcp
 
 

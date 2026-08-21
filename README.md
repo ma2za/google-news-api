@@ -66,6 +66,24 @@ google-news batch "AI regulation" "semiconductor supply chain" \
   --format json
 ```
 
+Fetch local Google News headlines:
+
+```bash
+google-news location "Chicago" --max-results 10 --format json
+```
+
+Build safe advanced queries:
+
+```bash
+google-news search "python" \
+  --exact-phrase "programming language" \
+  --any-word "rust" \
+  --any-word "go" \
+  --exclude-word "java" \
+  --in-title "tutorial" \
+  --show-query
+```
+
 Export machine-readable results as JSON or CSV:
 
 ```bash

@@ -88,6 +88,15 @@ def test_client_invalid_topic():
     assert "Invalid topic" in str(exc_info.value)
 
 
+def test_client_invalid_location():
+    """Test that invalid location raises ValidationError."""
+    client = GoogleNewsClient()
+    for invalid in ["", "   ", None, 123]:
+        with pytest.raises(ValidationError) as exc_info:
+            client.location_news(invalid)
+        assert "location must be a non-empty string" in str(exc_info.value)
+
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_get_top_news():
@@ -412,6 +421,45 @@ def test_sync_client_top_news():
     assert all("source" in article for article in news)
     assert all("published" in article for article in news)
     assert all("summary" in article for article in news)
+
+
+@pytest.mark.integration
+def test_sync_client_location_news():
+    """Test synchronous client location news."""
+    client = GoogleNewsClient()
+    news = client.location_news("New York", max_results=5)
+    assert isinstance(news, list)
+    assert len(news) <= 5
+    assert (
+        len(news) > 0
+    ), "Expected to find location news articles but none were returned"
+
+    assert all(isinstance(article, dict) for article in news)
+    assert all("title" in article for article in news)
+    assert all("link" in article for article in news)
+    assert all("source" in article for article in news)
+    assert all("published" in article for article in news)
+    assert all("summary" in article for article in news)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_async_client_location_news():
+    """Test async client location news."""
+    async with AsyncGoogleNewsClient() as client:
+        news = await client.location_news("London", max_results=5)
+        assert isinstance(news, list)
+        assert len(news) <= 5
+        assert (
+            len(news) > 0
+        ), "Expected to find location news articles but none were returned"
+
+        assert all(isinstance(article, dict) for article in news)
+        assert all("title" in article for article in news)
+        assert all("link" in article for article in news)
+        assert all("source" in article for article in news)
+        assert all("published" in article for article in news)
+        assert all("summary" in article for article in news)
 
 
 def test_client_cleanup():

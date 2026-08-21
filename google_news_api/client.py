@@ -389,6 +389,17 @@ class BaseGoogleNewsClient(ABC):
             }
             return f"{self.BASE_URL}headlines/section/{path}?{urlencode(params)}"
 
+        elif path.startswith("geo/"):
+            # For geographic headlines, we don't urlencode the path again
+            # if it's already encoded correctly, but we need to ensure the
+            # parameters are attached.
+            params = {
+                "hl": self.language_full,
+                "gl": self.country,
+                "ceid": f"{self.country}:{self.language_base}",
+            }
+            return f"{self.BASE_URL}headlines/section/{path}?{urlencode(params)}"
+
         params = {
             "hl": self.language_full,
             "gl": self.country,
@@ -718,6 +729,40 @@ class GoogleNewsClient(BaseGoogleNewsClient):
             return self.search(topic, max_results=max_results, mode=mode)
 
         path = self._get_topic_path(topic)
+        url = self._build_url(path)
+        feed = self._fetch_feed(url)
+        return self._parse_articles(feed, max_results)
+
+    def location_news(
+        self,
+        location: str,
+        *,
+        max_results: Optional[int] = None,
+    ) -> List[Article]:
+        """Get top news articles for a specific geographic location.
+
+        Args:
+            location: The name of the city, region, or country
+                (e.g. 'New York', 'Bucharest')
+            max_results: Maximum number of results to return
+
+        Returns:
+            List of article dictionaries
+
+        Raises:
+            ValidationError: If the location is empty or invalid
+        """
+        if not isinstance(location, str) or not location.strip():
+            raise ValidationError(
+                "location must be a non-empty string",
+                field="location",
+                value=location,
+            )
+
+        # We must quote the location string carefully to avoid double-encoding issues
+        # later while correctly mapping spaces to %20 instead of + for the URL path.
+        encoded_location = quote(location.strip())
+        path = f"geo/{encoded_location}"
         url = self._build_url(path)
         feed = self._fetch_feed(url)
         return self._parse_articles(feed, max_results)
@@ -1147,6 +1192,38 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
             return await self.search(topic, max_results=max_results, mode=mode)
 
         path = self._get_topic_path(topic)
+        url = self._build_url(path)
+        feed = await self._fetch_feed(url)
+        return self._parse_articles(feed, max_results)
+
+    async def location_news(
+        self,
+        location: str,
+        *,
+        max_results: Optional[int] = None,
+    ) -> List[Article]:
+        """Get top news articles for a specific geographic location asynchronously.
+
+        Args:
+            location: The name of the city, region, or country
+                (e.g. 'New York', 'Bucharest')
+            max_results: Maximum number of results to return
+
+        Returns:
+            List of article dictionaries
+
+        Raises:
+            ValidationError: If the location is empty or invalid
+        """
+        if not isinstance(location, str) or not location.strip():
+            raise ValidationError(
+                "location must be a non-empty string",
+                field="location",
+                value=location,
+            )
+
+        encoded_location = quote(location.strip())
+        path = f"geo/{encoded_location}"
         url = self._build_url(path)
         feed = await self._fetch_feed(url)
         return self._parse_articles(feed, max_results)

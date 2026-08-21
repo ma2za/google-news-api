@@ -20,6 +20,24 @@
 - Runtime APIs, CLI commands, MCP tools, defaults, output formats, and article
   dictionaries are unchanged.
 
+## 0.0.17 - 2026-08-21
+
+### Added
+
+- `GoogleNewsClient.location_news()` and `AsyncGoogleNewsClient.location_news()`
+  to fetch local headlines for a specific city, region, or country.
+- A new `location` CLI command to fetch local headlines (`google-news location "Chicago"`).
+- A new `location_news` tool in the MCP server for agent/AI workflows.
+- `NewsQuery` builder class to safely construct advanced search queries using
+  exact phrases, any-word matching, exclusions, and title targeting.
+- New CLI options for the `search` and `batch` commands to leverage the advanced
+  query builder: `--exact-phrase`, `--any-word`, `--exclude-word`, `--in-title`,
+  and `--show-query`.
+
+### Changed
+
+- Replaced test-name-based integration selection with explicit `@pytest.mark.integration` decorators in the test suite.
+
 ## 0.0.15 - 2026-07-29
 
 ### Added
