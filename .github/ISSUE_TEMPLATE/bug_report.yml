@@ -18,7 +18,7 @@ body:
     id: version
     attributes:
       label: google-news-api version
-      placeholder: Output of: google-news --version
+      placeholder: "Output of: google-news --version"
     validations:
       required: true
   - type: input
