@@ -177,3 +177,7 @@ cython_debug/
 .vscode/*
 
 *.json
+
+# Gemini
+.gemini/
+GEMINI.md
