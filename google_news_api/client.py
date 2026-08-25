@@ -417,17 +417,28 @@ class BaseGoogleNewsClient(ABC):
         # max_results would silently drop the last article(s).
         limit = max_results if max_results and max_results > 0 else None
         articles = feed.entries[:limit] if limit else feed.entries
+        # Entries can miss any field; attribute access on FeedParserDict
+        # raises AttributeError for absent keys, so map missing fields to
+        # None as the Article TypedDict declares.
         return [
             {
-                "title": entry.title,
-                "link": entry.link,
-                "published": entry.published,
+                "title": self._get_entry_field(entry, "title"),
+                "link": self._get_entry_field(entry, "link"),
+                "published": self._get_entry_field(entry, "published"),
                 "summary": entry.get("summary", ""),
                 "source": entry.source.title if "source" in entry else None,
                 "id": self._get_article_id(entry),
             }
             for entry in articles
         ]
+
+    @staticmethod
+    def _get_entry_field(entry: FeedParserDict, field: str) -> Optional[str]:
+        """Read an optional entry field from dict keys or attributes."""
+        value = entry.get(field)
+        if value is None:
+            value = getattr(entry, field, None)
+        return value
 
     @staticmethod
     def _get_article_id(entry: FeedParserDict) -> Optional[str]:
@@ -558,11 +569,19 @@ class GoogleNewsClient(BaseGoogleNewsClient):
 
                 feed = feedparser.parse(response.text)
 
-                if feed.bozo:
+                # feedparser sets bozo for recoverable defects too (undefined
+                # entities, encoding mismatches) while still extracting usable
+                # entries. Only treat bozo as fatal when nothing was parsed.
+                if feed.bozo and not feed.entries:
                     raise ParsingError(
                         "Failed to parse feed",
                         data=response.text,
                         error=feed.bozo_exception,
+                    )
+                if feed.bozo:
+                    logger.warning(
+                        f"Feed parsed with recoverable errors: "
+                        f"{feed.bozo_exception}"
                     )
 
                 self._cache.set(url, feed)
@@ -988,11 +1007,19 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
 
                 feed = feedparser.parse(response.text)
 
-                if feed.bozo:
+                # feedparser sets bozo for recoverable defects too (undefined
+                # entities, encoding mismatches) while still extracting usable
+                # entries. Only treat bozo as fatal when nothing was parsed.
+                if feed.bozo and not feed.entries:
                     raise ParsingError(
                         "Failed to parse feed",
                         data=response.text,
                         error=feed.bozo_exception,
+                    )
+                if feed.bozo:
+                    logger.warning(
+                        f"Feed parsed with recoverable errors: "
+                        f"{feed.bozo_exception}"
                     )
 
                 await self.cache.set(url, feed)
