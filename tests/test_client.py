@@ -1183,6 +1183,56 @@ def test_batch_search_validation():
     assert "Cannot use 'when' parameter together with" in str(exc_info.value)
 
 
+def test_batch_search_keeps_other_results_when_one_query_fails(monkeypatch):
+    """A per-query HTTP failure must not discard the rest of the batch."""
+    client = GoogleNewsClient()
+
+    def mock_search(query, **kwargs):
+        if query == "failing":
+            raise HTTPError("HTTP 503: Service Unavailable", status_code=503)
+        return [{"title": f"article for {query}"}]
+
+    monkeypatch.setattr(client, "search", mock_search)
+
+    results = client.batch_search(["ok", "failing", "also ok"])
+    assert results["ok"] == [{"title": "article for ok"}]
+    assert results["failing"] == []
+    assert results["also ok"] == [{"title": "article for also ok"}]
+
+
+def test_batch_search_propagates_configuration_error(monkeypatch):
+    """Configuration problems fail the whole batch instead of being swallowed."""
+    client = GoogleNewsClient()
+
+    def mock_search(query, **kwargs):
+        raise ConfigurationError("SearchAPI key not found", field="api_key")
+
+    monkeypatch.setattr(client, "search", mock_search)
+
+    with pytest.raises(ConfigurationError):
+        client.batch_search(["query"])
+
+
+@pytest.mark.asyncio
+async def test_async_batch_search_keeps_other_results_when_one_query_fails(
+    monkeypatch,
+):
+    """A per-query HTTP failure must not discard the rest of the batch."""
+    async with AsyncGoogleNewsClient() as client:
+
+        async def mock_search(query, **kwargs):
+            if query == "failing":
+                raise HTTPError("HTTP 503: Service Unavailable", status_code=503)
+            return [{"title": f"article for {query}"}]
+
+        monkeypatch.setattr(client, "search", mock_search)
+
+        results = await client.batch_search(["ok", "failing", "also ok"], delay=0)
+        assert results["ok"] == [{"title": "article for ok"}]
+        assert results["failing"] == []
+        assert results["also ok"] == [{"title": "article for also ok"}]
+
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_async_batch_search():
