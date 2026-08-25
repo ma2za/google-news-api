@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- The in-memory response caches now prune expired entries on every write.
+  Previously an expired entry was only removed when its exact key was
+  requested again, so long-running processes (for example the MCP server)
+  accumulated dead entries indefinitely.
+
 ## 0.0.16 - 2026-08-11
 
 ### Added
