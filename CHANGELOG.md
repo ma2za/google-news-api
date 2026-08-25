@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Rate-limited responses with an HTTP-date `Retry-After` header (allowed by
+  RFC 9110) now raise `RateLimitError` with the remaining delay instead of
+  crashing with an unhandled `ValueError`. Malformed header values fall back
+  to the previous 60 second default.
+
 ## 0.0.16 - 2026-08-11
 
 ### Added
