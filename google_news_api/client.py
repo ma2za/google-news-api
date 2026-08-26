@@ -710,7 +710,10 @@ class GoogleNewsClient(BaseGoogleNewsClient):
                     include_domains=included,
                     exclude_domains=excluded,
                 )
-            except ValidationError as e:
+            except (ValidationError, HTTPError, RateLimitError, ParsingError) as e:
+                # A failure on one query must not discard the results already
+                # collected for the other queries. ConfigurationError still
+                # propagates: it would fail identically for every query.
                 logger.error(f"Error searching for query '{query}': {str(e)}")
                 results[query] = []
 
@@ -1162,7 +1165,10 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
                     if pbar is not None:
                         pbar.update(1)
                     return query, results
-            except ValidationError as e:
+            except (ValidationError, HTTPError, RateLimitError, ParsingError) as e:
+                # A failure on one query must not discard the results already
+                # collected for the other queries. ConfigurationError still
+                # propagates: it would fail identically for every query.
                 logger.error(f"Error searching for query '{query}': {str(e)}")
                 if pbar is not None:
                     pbar.update(1)
