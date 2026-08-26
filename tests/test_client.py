@@ -1003,6 +1003,76 @@ async def test_async_client_error_handling(monkeypatch):
         assert "Request failed" in str(exc_info.value)
 
 
+RECOVERABLE_BOZO_FEED = """<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"><channel><title>t</title>
+<item><title>Hello&nbsp;World</title>
+<link>https://example.com/a</link>
+<pubDate>Tue, 16 Jun 2026 12:00:00 GMT</pubDate>
+<description>s</description></item>
+</channel></rss>"""
+
+
+def test_search_tolerates_recoverable_feed_defects(monkeypatch):
+    """A bozo feed with usable entries must not raise ParsingError."""
+    import httpx
+
+    client = GoogleNewsClient()
+    response = httpx.Response(
+        200,
+        text=RECOVERABLE_BOZO_FEED,
+        request=httpx.Request("GET", "http://example.com"),
+    )
+    monkeypatch.setattr(client._client, "get", lambda _: response)
+
+    articles = client.search("test")
+    assert len(articles) == 1
+    # &nbsp; decodes to a non-breaking space (U+00A0)
+    assert articles[0]["title"] == "Hello\xa0World"
+
+
+@pytest.mark.asyncio
+async def test_async_search_tolerates_recoverable_feed_defects(monkeypatch):
+    """A bozo feed with usable entries must not raise ParsingError."""
+    import httpx
+
+    async with AsyncGoogleNewsClient() as client:
+        response = httpx.Response(
+            200,
+            text=RECOVERABLE_BOZO_FEED,
+            request=httpx.Request("GET", "http://example.com"),
+        )
+
+        async def mock_get(_):
+            return response
+
+        monkeypatch.setattr(client.client, "get", mock_get)
+
+        articles = await client.search("test")
+        assert len(articles) == 1
+        # &nbsp; decodes to a non-breaking space (U+00A0)
+        assert articles[0]["title"] == "Hello\xa0World"
+
+
+def test_parse_articles_tolerates_missing_fields():
+    """Entries without title/link/published map to None instead of raising."""
+    from feedparser import FeedParserDict
+
+    client = GoogleNewsClient()
+    feed = FeedParserDict()
+    entry = FeedParserDict()
+    entry.title = "Only a title"
+    feed.entries = [entry]
+
+    articles = client._parse_articles(feed)
+    assert len(articles) == 1
+    assert articles[0]["title"] == "Only a title"
+    assert articles[0]["link"] is None
+    assert articles[0]["published"] is None
+    assert articles[0]["summary"] == ""
+    assert articles[0]["source"] is None
+    assert articles[0]["id"] is None
+
+
 def test_parse_articles():
     """Test article parsing with different inputs."""
     from feedparser import FeedParserDict

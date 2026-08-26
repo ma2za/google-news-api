@@ -4,6 +4,13 @@
 
 ### Fixed
 
+- Feeds that feedparser flags as bozo for recoverable defects (undefined
+  entities, encoding mismatches) are no longer rejected when they still
+  contain usable entries. A warning is logged instead; feeds with no parsed
+  entries keep raising `ParsingError`.
+- Feed entries missing `title`, `link`, or `published` no longer crash with
+  `AttributeError`. Missing fields map to `None`, matching the `Article`
+  TypedDict contract.
 - Rate-limited responses with an HTTP-date `Retry-After` header (allowed by
   RFC 9110) now raise `RateLimitError` with the remaining delay instead of
   crashing with an unhandled `ValueError`. Malformed header values fall back
