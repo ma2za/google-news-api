@@ -8,6 +8,7 @@ This MCP server provides a bridge to the Google News service, offering tools to 
 - Batch search across multiple queries
 - Included and excluded publisher-domain filters
 - Top news retrieval by topic
+- Local headlines for a specific city, region, or country
 - URL decoding for direct article access
 - Automatic rate limiting (60 requests per minute)
 - Response caching (5 minutes TTL)
@@ -48,6 +49,17 @@ Parameters:
 - `decode_links`: Whether to decode Google News URLs to publisher URLs (default: `True`)
 - `extract_text`: Whether to fetch decoded URLs and extract article text (default: `True`)
 - `mode`: Search backend: `default`, `searchapi_light`, or `searchapi_portal` (default: `default`)
+
+### 4. location_news
+Get top news articles for a specific geographic location.
+
+Parameters:
+- `location`: City, region, or country (e.g. "New York", "Bucharest")
+- `max_results`: (Optional) Maximum number of results to return
+- `language`: Language code (default: "en")
+- `country`: Country code (default: "US")
+- `decode_links`: Whether to decode Google News URLs to publisher URLs (default: `True`)
+- `extract_text`: Whether to fetch decoded URLs and extract article text (default: `True`)
 
 ## Response Format
 Search and top-news tools return a list of article dictionaries containing:

@@ -277,7 +277,8 @@ The packaged entrypoints are the `google-news-mcp` command and the
 `mcp_server/googlenews.py` script remains as a local development compatibility
 wrapper.
 
-The MCP server exposes `news_search`, `batch_news_search`, and `top_news`. By default, the tools
+The MCP server exposes `news_search`, `batch_news_search`, `top_news`, and
+`location_news`. By default, the tools
 decode Google News links to publisher URLs, store the original URL in
 `google_link`, and extract article text when possible. The tools also accept
 `mode` for the same search modes as the Python client.
