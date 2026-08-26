@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.0.18 - 2026-08-26
+
+### Added
+
+- `NormalizedArticle` TypedDict to represent articles with enriched fields (`published_datetime`, `source_domain`).
+- Result helper functions in `results.py`: `deduplicate_articles`, `sort_articles`, `parse_published`, `source_domain`, and `normalize_article(s)`.
+- CLI arguments `--deduplicate`, `--sort {newest,oldest}`, and `--normalize` across all read commands, with dynamic CSV headers and proper ISO 8601 JSON serialization.
+
 ### Fixed
 
 - The in-memory response caches now prune expired entries on every write.
