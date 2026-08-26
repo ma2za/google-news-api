@@ -159,13 +159,20 @@ class Cache:
     def set(self, key: str, value: Any) -> None:
         """Set value in cache.
 
+        Expired entries are pruned on every write so the cache cannot grow
+        without bound in long-running processes: entries for keys that are
+        never requested again would otherwise stay in memory forever.
+
         Args:
             key: Cache key
             value: Value to cache
         """
         with self.lock:
-            expiry = datetime.now() + timedelta(seconds=self.ttl)
-            self.cache[key] = (value, expiry)
+            now = datetime.now()
+            expired = [k for k, (_, expiry) in self.cache.items() if now > expiry]
+            for expired_key in expired:
+                del self.cache[expired_key]
+            self.cache[key] = (value, now + timedelta(seconds=self.ttl))
 
     def clear(self) -> None:
         """Clear all cached values."""
@@ -215,13 +222,20 @@ class AsyncCache:
     async def set(self, key: str, value: Any) -> None:
         """Set value in cache.
 
+        Expired entries are pruned on every write so the cache cannot grow
+        without bound in long-running processes: entries for keys that are
+        never requested again would otherwise stay in memory forever.
+
         Args:
             key: Cache key
             value: Value to cache
         """
         async with self.lock:
-            expiry = datetime.now() + timedelta(seconds=self.ttl)
-            self.cache[key] = (value, expiry)
+            now = datetime.now()
+            expired = [k for k, (_, expiry) in self.cache.items() if now > expiry]
+            for expired_key in expired:
+                del self.cache[expired_key]
+            self.cache[key] = (value, now + timedelta(seconds=self.ttl))
 
     async def clear(self) -> None:
         """Clear all cached values."""
