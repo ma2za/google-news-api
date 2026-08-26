@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, TextIO
 
@@ -14,10 +15,19 @@ from . import __version__
 from .client import GoogleNewsClient
 from .exceptions import GoogleNewsError
 from .providers import VALID_SEARCH_MODES
+from .results import deduplicate_articles, normalize_articles, sort_articles
 from .types import Article, EnrichedArticle
 
 OUTPUT_FIELDS = ("title", "source", "published", "link")
 CSV_FIELDS = ("title", "source", "published", "link", "summary", "id", "google_link")
+NORMALIZED_CSV_FIELDS = (*CSV_FIELDS, "published_datetime", "source_domain")
+
+
+class _DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
 
 
 def _add_query_options(parser: argparse.ArgumentParser) -> None:
@@ -97,6 +107,9 @@ def _add_common_options(parser: argparse.ArgumentParser) -> None:
         dest="output_format",
     )
     parser.add_argument("--decode-links", action="store_true")
+    parser.add_argument("--deduplicate", action="store_true")
+    parser.add_argument("--sort", choices=("newest", "oldest"))
+    parser.add_argument("--normalize", action="store_true")
     parser.add_argument("--output")
     parser.add_argument("--force", action="store_true")
 
@@ -126,16 +139,41 @@ def _decode_articles(
     return enriched_articles
 
 
+def _process_articles(
+    args: argparse.Namespace, articles: List[Article]
+) -> List[Article]:
+    if getattr(args, "deduplicate", False):
+        articles = deduplicate_articles(articles)
+    if getattr(args, "sort", None):
+        articles = sort_articles(articles, newest_first=args.sort == "newest")
+    if getattr(args, "normalize", False):
+        articles = normalize_articles(articles)  # type: ignore
+    return articles
+
+
 def _write_json(articles: Iterable[Article], output: TextIO) -> None:
     json.dump(list(articles), output, indent=2)
     output.write("\n")
 
 
-def _write_csv(articles: Iterable[Article], output: TextIO) -> None:
-    writer = csv.DictWriter(output, fieldnames=CSV_FIELDS, extrasaction="ignore")
+def _write_csv(
+    args: argparse.Namespace, articles: Iterable[Article], output: TextIO
+) -> None:
+    fieldnames = (
+        NORMALIZED_CSV_FIELDS if getattr(args, "normalize", False) else CSV_FIELDS
+    )
+    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
     writer.writeheader()
     for article in articles:
-        writer.writerow({field: article.get(field) for field in CSV_FIELDS})
+        row = {field: article.get(field) for field in fieldnames}
+        if (
+            getattr(args, "normalize", False)
+            and "published_datetime" in row
+            and row["published_datetime"]
+        ):
+            if isinstance(row["published_datetime"], datetime):
+                row["published_datetime"] = row["published_datetime"].isoformat()
+        writer.writerow(row)
 
 
 def _write_table(articles: Iterable[Article], output: TextIO) -> None:
@@ -160,36 +198,42 @@ def _write_table(articles: Iterable[Article], output: TextIO) -> None:
 
 
 def _write_articles(
-    articles: List[Article], output_format: str, output: TextIO
+    args: argparse.Namespace, articles: List[Article], output: TextIO
 ) -> None:
-    if output_format == "json":
+    if args.output_format == "json":
         _write_json(articles, output)
-    elif output_format == "csv":
-        _write_csv(articles, output)
+    elif args.output_format == "csv":
+        _write_csv(args, articles, output)
     else:
         _write_table(articles, output)
 
 
 def _write_batch_articles(
-    results: Dict[str, List[Article]], output_format: str, output: TextIO
+    args: argparse.Namespace, results: Dict[str, List[Article]], output: TextIO
 ) -> None:
-    if output_format == "json":
-        json.dump(results, output, indent=2)
+    if args.output_format == "json":
+        json.dump(results, output, indent=2, cls=_DateTimeEncoder)
         output.write("\n")
         return
 
-    if output_format == "csv":
-        fieldnames = ("query", *CSV_FIELDS)
+    if args.output_format == "csv":
+        base_fields = NORMALIZED_CSV_FIELDS if args.normalize else CSV_FIELDS
+        fieldnames = ("query", *base_fields)
         writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
         for query, articles in results.items():
             for article in articles:
-                writer.writerow(
-                    {
-                        "query": query,
-                        **{field: article.get(field) for field in CSV_FIELDS},
-                    }
-                )
+                row = {
+                    "query": query,
+                    **{field: article.get(field) for field in base_fields},
+                }
+                if (
+                    args.normalize
+                    and "published_datetime" in row
+                    and row["published_datetime"]
+                ):
+                    row["published_datetime"] = row["published_datetime"].isoformat()
+                writer.writerow(row)
         return
 
     for index, (query, articles) in enumerate(results.items()):
@@ -251,12 +295,15 @@ def _run(args: argparse.Namespace, output: TextIO) -> None:
                 include_domains=args.include_domains,
                 exclude_domains=args.exclude_domains,
             )
-            if args.decode_links:
-                results = {
-                    query: _decode_articles(client, articles)
-                    for query, articles in results.items()
-                }
-            _write_batch_articles(results, args.output_format, output)
+
+            processed_results = {}
+            for query, articles in results.items():
+                if args.decode_links:
+                    articles = _decode_articles(client, articles)  # type: ignore
+                articles = _process_articles(args, articles)
+                processed_results[query] = articles
+
+            _write_batch_articles(args, processed_results, output)
             return
         elif args.command == "location":
             articles = client.location_news(
@@ -271,9 +318,10 @@ def _run(args: argparse.Namespace, output: TextIO) -> None:
             )
 
         if args.decode_links:
-            articles = _decode_articles(client, articles)
+            articles = _decode_articles(client, articles)  # type: ignore
 
-        _write_articles(articles, args.output_format, output)
+        articles = _process_articles(args, articles)
+        _write_articles(args, articles, output)
 
 
 def _write_output_file(path: Path, content: str, force: bool) -> None:

@@ -293,8 +293,11 @@ def test_cli_batch_writes_grouped_json(monkeypatch):
 
 def test_write_batch_articles_flattens_csv():
     output = io.StringIO()
+    import argparse
 
-    cli._write_batch_articles({"python": ARTICLES}, "csv", output)
+    args = argparse.Namespace(output_format="csv", normalize=False)
+
+    cli._write_batch_articles(args, {"python": ARTICLES}, output)
 
     rows = output.getvalue().splitlines()
     assert rows[0].startswith("query,title,source,published")
@@ -303,8 +306,11 @@ def test_write_batch_articles_flattens_csv():
 
 def test_write_batch_articles_labels_table_sections():
     output = io.StringIO()
+    import argparse
 
-    cli._write_batch_articles({"python": ARTICLES, "rust": ARTICLES}, "table", output)
+    args = argparse.Namespace(output_format="table", normalize=False)
+
+    cli._write_batch_articles(args, {"python": ARTICLES, "rust": ARTICLES}, output)
 
     assert "QUERY: python" in output.getvalue()
     assert "QUERY: rust" in output.getvalue()
@@ -482,3 +488,44 @@ def test_cli_output_reports_filesystem_error(monkeypatch, tmp_path):
     assert exit_code == 1
     assert not output_path.exists()
     assert error.getvalue().startswith("google-news: ")
+
+
+def test_cli_normalize_adds_fields_to_csv(monkeypatch, tmp_path):
+    install_fake_client(monkeypatch)
+    output_path = tmp_path / "articles.csv"
+
+    exit_code = cli.main(
+        [
+            "search",
+            "python",
+            "--normalize",
+            "--format",
+            "csv",
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    assert exit_code == 0
+    content = output_path.read_text(encoding="utf-8")
+    assert "published_datetime,source_domain" in content
+
+
+def test_cli_deduplicate_flag(monkeypatch):
+    install_fake_client(monkeypatch)
+    output = io.StringIO()
+
+    exit_code = cli.main(
+        ["search", "python", "--deduplicate", "--format", "json"], output=output
+    )
+    assert exit_code == 0
+
+
+def test_cli_sort_flag(monkeypatch):
+    install_fake_client(monkeypatch)
+    output = io.StringIO()
+
+    exit_code = cli.main(
+        ["search", "python", "--sort", "newest", "--format", "json"], output=output
+    )
+    assert exit_code == 0
