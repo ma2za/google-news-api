@@ -129,8 +129,10 @@ def sort_articles(
         dt = parse_published(article.get("published"))
         if dt is None:
             # Undated goes last.
-            # In descending (newest_first=True), we return a minimal timezone-aware datetime.
-            # In ascending (newest_first=False), we return a maximal timezone-aware datetime.
+            # In descending (newest_first=True), we return a minimal
+            # timezone-aware datetime.
+            # In ascending (newest_first=False), we return a maximal
+            # timezone-aware datetime.
             if newest_first:
                 return datetime.min.replace(tzinfo=timezone.utc)
             return datetime.max.replace(tzinfo=timezone.utc)
