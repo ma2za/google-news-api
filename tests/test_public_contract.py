@@ -27,6 +27,7 @@ def test_public_exports_are_stable():
         "ClientConfig",
         "ConfigurationError",
         "EnrichedArticle",
+        "NormalizedArticle",
         "GoogleNewsClient",
         "GoogleNewsError",
         "HTTPError",
@@ -36,6 +37,12 @@ def test_public_exports_are_stable():
         "RateLimiter",
         "ValidationError",
         "setup_logging",
+        "deduplicate_articles",
+        "normalize_article",
+        "normalize_articles",
+        "parse_published",
+        "sort_articles",
+        "source_domain",
     }
 
 
