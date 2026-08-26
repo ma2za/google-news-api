@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `batch_search()` no longer discards the whole batch when a single query
+  fails with an HTTP, rate-limit, or parsing error after retries. The failing
+  query now returns an empty list (matching the existing behavior for invalid
+  queries) while the other queries keep their results. Configuration errors
+  still propagate because they would fail identically for every query.
+
 ## 0.0.16 - 2026-08-11
 
 ### Added
