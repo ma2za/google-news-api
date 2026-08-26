@@ -1,6 +1,7 @@
 """Tests for the results normalization and deduplication helpers."""
 
 from datetime import datetime, timezone
+
 import pytest
 
 from google_news_api.exceptions import ValidationError
@@ -119,14 +120,14 @@ def test_sort_articles():
         {"title": "C", "published": "Wed, 21 Aug 2026 11:00:00 GMT"},
         {"title": "Undated"},
     ]
-    
+
     # Newest first
     sorted_newest = sort_articles(articles, newest_first=True)
     assert sorted_newest[0]["title"] == "A"
     assert sorted_newest[1]["title"] == "B"
     assert sorted_newest[2]["title"] == "C"
     assert sorted_newest[3]["title"] == "Undated"
-    
+
     # Oldest first
     sorted_oldest = sort_articles(articles, newest_first=False)
     assert sorted_oldest[0]["title"] == "C"
@@ -137,12 +138,12 @@ def test_sort_articles():
 
 def test_normalize_article_immutability():
     original = {
-        "title": "A", 
+        "title": "A",
         "published": "Wed, 21 Aug 2026 12:00:00 GMT",
-        "link": "https://example.com"
+        "link": "https://example.com",
     }
     normalized = normalize_article(original)
-    
+
     assert "published_datetime" in normalized
     assert "source_domain" in normalized
     assert "published_datetime" not in original
