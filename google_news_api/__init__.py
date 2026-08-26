@@ -14,7 +14,15 @@ from .exceptions import (
 )
 from .logging import setup_logging
 from .query import NewsQuery
-from .types import Article, EnrichedArticle
+from .results import (
+    deduplicate_articles,
+    normalize_article,
+    normalize_articles,
+    parse_published,
+    sort_articles,
+    source_domain,
+)
+from .types import Article, EnrichedArticle, NormalizedArticle
 from .utils import AsyncCache, AsyncRateLimiter, Cache, RateLimiter
 
 try:
@@ -39,6 +47,13 @@ __all__ = [
     "setup_logging",
     "Article",
     "EnrichedArticle",
+    "NormalizedArticle",
+    "deduplicate_articles",
+    "normalize_article",
+    "normalize_articles",
+    "parse_published",
+    "sort_articles",
+    "source_domain",
     "AsyncCache",
     "AsyncRateLimiter",
     "Cache",
