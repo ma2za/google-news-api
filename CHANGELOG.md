@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- Rate-limited responses with an HTTP-date `Retry-After` header (allowed by
+  RFC 9110) now raise `RateLimitError` with the remaining delay instead of
+  crashing with an unhandled `ValueError`. Malformed header values fall back
+  to the previous 60 second default.
 - `batch_search()` no longer discards the whole batch when a single query
   fails with an HTTP, rate-limit, or parsing error after retries. The failing
   query now returns an empty list (matching the existing behavior for invalid

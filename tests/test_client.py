@@ -838,6 +838,53 @@ def test_client_error_handling(monkeypatch):
     assert "Request failed" in str(exc_info.value)
 
 
+def test_parse_retry_after_header_values():
+    """Retry-After must accept delay-seconds and HTTP-date values (RFC 9110)."""
+    from google_news_api.client import _parse_retry_after
+
+    # Missing header falls back to the 60 second default
+    assert _parse_retry_after(None) == 60.0
+
+    # Numeric delay-seconds, negative values clamped to zero
+    assert _parse_retry_after("120") == 120.0
+    assert _parse_retry_after("1.5") == 1.5
+    assert _parse_retry_after("-5") == 0.0
+
+    # HTTP-date in the future maps to the remaining delay
+    future = datetime.now(timezone.utc) + timedelta(seconds=90)
+    parsed = _parse_retry_after(future.strftime("%a, %d %b %Y %H:%M:%S GMT"))
+    assert 80.0 <= parsed <= 90.0
+
+    # HTTP-date in the past clamps to zero
+    past = datetime.now(timezone.utc) - timedelta(seconds=90)
+    assert _parse_retry_after(past.strftime("%a, %d %b %Y %H:%M:%S GMT")) == 0.0
+
+    # Garbage falls back to the default instead of raising ValueError
+    assert _parse_retry_after("not-a-delay") == 60.0
+
+
+def test_rate_limit_with_http_date_retry_after(monkeypatch):
+    """A 429 with an HTTP-date Retry-After raises RateLimitError, not ValueError."""
+    import httpx
+
+    from google_news_api.exceptions import RateLimitError
+
+    monkeypatch.setattr("google_news_api.utils.time.sleep", lambda _: None)
+    client = GoogleNewsClient()
+
+    retry_at = datetime.now(timezone.utc) + timedelta(seconds=90)
+    response = httpx.Response(
+        429,
+        headers={"Retry-After": retry_at.strftime("%a, %d %b %Y %H:%M:%S GMT")},
+        request=httpx.Request("GET", "http://example.com"),
+    )
+    monkeypatch.setattr(client._client, "get", lambda _: response)
+
+    with pytest.raises(RateLimitError) as exc_info:
+        client.search("test")
+    assert 0.0 <= exc_info.value.retry_after <= 90.0
+
+
 def test_sync_decode_url(monkeypatch):
     """Test synchronous Google News URL decoding with mocked responses."""
     import httpx

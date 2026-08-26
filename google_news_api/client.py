@@ -15,7 +15,8 @@ import random
 import re
 import time
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import quote, urlencode, urlparse
 
@@ -88,6 +89,34 @@ CHROME_HEADERS = {
     "Connection": "keep-alive",
     "Cache-Control": "max-age=0",
 }
+
+
+DEFAULT_RETRY_AFTER = 60.0
+
+
+def _parse_retry_after(value: Optional[str]) -> float:
+    """Parse a Retry-After header value into a delay in seconds.
+
+    RFC 9110 allows both delay-seconds and HTTP-date values. Malformed or
+    missing values fall back to a 60 second delay instead of raising, so a
+    rate-limited response always surfaces as RateLimitError.
+    """
+    if value is None:
+        return DEFAULT_RETRY_AFTER
+
+    try:
+        return max(0.0, float(value))
+    except ValueError:
+        pass
+
+    try:
+        retry_at = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return DEFAULT_RETRY_AFTER
+
+    if retry_at.tzinfo is None:
+        retry_at = retry_at.replace(tzinfo=timezone.utc)
+    return max(0.0, (retry_at - datetime.now(timezone.utc)).total_seconds())
 
 
 class BaseGoogleNewsClient(ABC):
@@ -542,7 +571,9 @@ class GoogleNewsClient(BaseGoogleNewsClient):
                 response = self._client.get(url)
 
                 if response.status_code == 429:
-                    retry_after = float(response.headers.get("Retry-After", 60))
+                    retry_after = _parse_retry_after(
+                        response.headers.get("Retry-After")
+                    )
                     raise RateLimitError(
                         "Rate limit exceeded",
                         retry_after=retry_after,
@@ -810,7 +841,9 @@ class GoogleNewsClient(BaseGoogleNewsClient):
                 )
 
                 if response.status_code == 429:
-                    retry_after = float(response.headers.get("Retry-After", 60))
+                    retry_after = _parse_retry_after(
+                        response.headers.get("Retry-After")
+                    )
                     raise RateLimitError(
                         "Rate limit exceeded",
                         retry_after=retry_after,
@@ -975,7 +1008,9 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
                 response = await self.client.get(url)
 
                 if response.status_code == 429:
-                    retry_after = float(response.headers.get("Retry-After", 60))
+                    retry_after = _parse_retry_after(
+                        response.headers.get("Retry-After")
+                    )
                     raise RateLimitError(
                         "Rate limit exceeded",
                         retry_after=retry_after,
@@ -1292,7 +1327,9 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
                 )
 
                 if response.status_code == 429:
-                    retry_after = float(response.headers.get("Retry-After", 60))
+                    retry_after = _parse_retry_after(
+                        response.headers.get("Retry-After")
+                    )
                     raise RateLimitError(
                         "Rate limit exceeded",
                         retry_after=retry_after,
