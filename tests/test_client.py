@@ -712,6 +712,38 @@ async def test_async_cache_operations():
     assert await cache.get("key2") is None
 
 
+def test_cache_set_prunes_expired_entries():
+    """Writes must evict expired entries so the cache cannot grow forever."""
+    from google_news_api.utils import Cache
+
+    cache = Cache(ttl=300)
+    cache.set("fresh", "value")
+    cache.cache["stale"] = ("old", datetime.now() - timedelta(seconds=1))
+
+    cache.set("new", "value")
+
+    assert "stale" not in cache.cache
+    assert cache.get("fresh") == "value"
+    assert cache.get("new") == "value"
+
+
+@pytest.mark.asyncio
+async def test_async_cache_set_prunes_expired_entries():
+    """Writes must evict expired entries so the cache cannot grow forever."""
+    from google_news_api.utils import AsyncCache
+
+    cache = AsyncCache(ttl=300)
+    await cache.set("fresh", "value")
+    async with cache.lock:
+        cache.cache["stale"] = ("old", datetime.now() - timedelta(seconds=1))
+
+    await cache.set("new", "value")
+
+    assert "stale" not in cache.cache
+    assert await cache.get("fresh") == "value"
+    assert await cache.get("new") == "value"
+
+
 def test_retry_sync_validation():
     """Test retry decorator validation."""
     from google_news_api.utils import retry_sync

@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- The in-memory response caches now prune expired entries on every write.
+  Previously an expired entry was only removed when its exact key was
+  requested again, so long-running processes (for example the MCP server)
+  accumulated dead entries indefinitely.
 - Feeds that feedparser flags as bozo for recoverable defects (undefined
   entities, encoding mismatches) are no longer rejected when they still
   contain usable entries. A warning is logged instead; feeds with no parsed
