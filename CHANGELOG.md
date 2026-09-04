@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+## 0.0.19 - 2026-08-30
+
+### Added
+
+- `ArticleEnricher` and `AsyncArticleEnricher` for ordered, non-mutating link
+  decoding and optional publisher-page text extraction.
+- An `extract` installation extra and CLI `--extract-text` option for reusable
+  full-text enrichment outside the MCP server.
+
+### Changed
+
+- The MCP server now delegates article decoding and extraction to the shared
+  async enricher without changing its tool names or defaults.
+- Added SearchAPI's sponsored UTM attribution link to both SearchAPI modes in
+  the README and regression coverage for the attribution parameters sent by
+  both SearchAPI engines.
+- Pytest scratch output under `.pytest_temp/` is ignored without hiding CSV
+  files elsewhere in the repository.
+
+### Compatibility
+
+- Existing client methods, base article dictionaries, CLI defaults, SearchAPI
+  modes, and MCP tool signatures are unchanged. Extraction remains optional,
+  and importing the base package does not require extraction dependencies.
+
 ## 0.0.18 - 2026-08-26
 
 ### Added

@@ -1,6 +1,6 @@
 [project]
 name = "mcp-server"
-version = "0.0.18"
+version = "0.0.19"
 description = "MCP server for searching Google News RSS, top stories, decoded article URLs, and extracted article text."
 readme = "README.md"
 requires-python = ">=3.10"

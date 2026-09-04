@@ -4,6 +4,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from .client import AsyncGoogleNewsClient, GoogleNewsClient
 from .config import ClientConfig
+from .enrichment import ArticleEnricher, AsyncArticleEnricher
 from .exceptions import (
     ConfigurationError,
     GoogleNewsError,
@@ -37,6 +38,8 @@ __all__ = [
     "AsyncGoogleNewsClient",
     "GoogleNewsClient",
     "ClientConfig",
+    "ArticleEnricher",
+    "AsyncArticleEnricher",
     "NewsQuery",
     "ConfigurationError",
     "GoogleNewsError",

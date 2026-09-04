@@ -181,3 +181,4 @@ cython_debug/
 # removed-provider
 removed-provider.md
 .tmp/
+.pytest_temp/

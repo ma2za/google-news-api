@@ -109,6 +109,13 @@ Decode Google News RSS links to publisher URLs when exporting:
 google-news search "climate change" --when 7d --decode-links --format json
 ```
 
+Extract article text with the optional extraction dependencies:
+
+```bash
+pip install "google-news-api[extract]"
+google-news search "climate change" --when 7d --extract-text --format json
+```
+
 Use the same SearchAPI modes as the Python client:
 
 ```bash
@@ -127,6 +134,7 @@ google-news search "artificial intelligence regulation" \
 | Domain filters | Include trusted publishers or exclude unwanted domains |
 | Sync and async clients | `GoogleNewsClient` and `AsyncGoogleNewsClient` |
 | URL decoding | Decode Google News RSS article links to publisher URLs |
+| Article enrichment | Optional publisher-link decoding and full-text extraction |
 | Batch search | Search several queries with shared filters |
 | SearchAPI modes | Optional direct publisher URLs and richer snippets |
 | CLI exports | Table, JSON, and CSV output from the `google-news` command |
@@ -207,6 +215,53 @@ with GoogleNewsClient() as client:
     publisher_url = client.decode_url(article["link"])
 ```
 
+### Extract Full Article Text
+
+Install the optional extraction dependencies on Python 3.10 or newer:
+
+```bash
+pip install "google-news-api[extract]"
+```
+
+`ArticleEnricher` preserves input order and dictionaries. It decodes Google
+News links, keeps the original URL in `google_link`, and adds `text` when the
+publisher page is reachable:
+
+```python
+from google_news_api import ArticleEnricher, GoogleNewsClient
+
+with GoogleNewsClient() as client:
+    articles = client.search("climate policy", when="24h", max_results=5)
+    enriched = ArticleEnricher(client).enrich(articles, extract_text=True)
+
+for article in enriched:
+    print(article.get("text", ""))
+```
+
+Async code uses the matching enricher:
+
+```python
+import asyncio
+
+from google_news_api import AsyncArticleEnricher, AsyncGoogleNewsClient
+
+
+async def main():
+    async with AsyncGoogleNewsClient() as client:
+        articles = await client.search("climate policy", max_results=5)
+        return await AsyncArticleEnricher(client).enrich(
+            articles,
+            extract_text=True,
+        )
+
+
+enriched = asyncio.run(main())
+```
+
+Extraction does not bypass paywalls, authentication, robots controls, or
+publisher blocking. A failed page affects only that article. SearchAPI results
+that already contain publisher URLs can be extracted without URL decoding.
+
 ### Async Client
 
 ```python
@@ -232,8 +287,8 @@ The `search()`, `batch_search()`, and `top_news()` methods support these modes:
 | Mode | Backend | Use When |
 |------|---------|----------|
 | `"default"` | Google News RSS | You want fast Google News RSS results with no API key |
-| `"searchapi_portal"` | [SearchAPI Google News Portal](https://www.searchapi.io/docs/google-news-portal-api) | You want direct publisher URLs |
-| `"searchapi_light"` | [SearchAPI Google News Light](https://www.searchapi.io/docs/google-news-light-api) | You want recent results and snippets from SearchAPI |
+| `"searchapi_portal"` | [SearchAPI Google News Portal](https://www.searchapi.io/google-news?utm_source=Github&utm_medium=sponsorship&utm_campaign=google_news_api&utm_content=ma2za%2Fgoogle-news-api) | You want direct publisher URLs |
+| `"searchapi_light"` | [SearchAPI Google News Light](https://www.searchapi.io/google-news?utm_source=Github&utm_medium=sponsorship&utm_campaign=google_news_api&utm_content=ma2za%2Fgoogle-news-api) | You want recent results and snippets from SearchAPI |
 
 SearchAPI modes require an API key:
 
@@ -280,8 +335,9 @@ wrapper.
 The MCP server exposes `news_search`, `batch_news_search`, `top_news`, and
 `location_news`. By default, the tools
 decode Google News links to publisher URLs, store the original URL in
-`google_link`, and extract article text when possible. The tools also accept
-`mode` for the same search modes as the Python client.
+`google_link`, and extract article text through the same
+`AsyncArticleEnricher` used by Python callers. The tools also accept `mode` for
+the same search modes as the Python client.
 
 For faster headline-only calls:
 

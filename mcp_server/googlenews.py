@@ -1,22 +1,20 @@
 """Compatibility wrapper for the packaged Google News MCP server."""
 
 from google_news_api.mcp_server import (
-    _attach_extracted_text,
     batch_news_search,
     create_mcp_app,
-    extract_article_text,
     get_client,
+    location_news,
     main,
     news_search,
     top_news,
 )
 
 __all__ = [
-    "_attach_extracted_text",
     "batch_news_search",
     "create_mcp_app",
-    "extract_article_text",
     "get_client",
+    "location_news",
     "main",
     "mcp",
     "news_search",
