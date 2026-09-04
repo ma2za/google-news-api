@@ -199,7 +199,10 @@ def test_cli_decode_links_preserves_google_link(monkeypatch):
     articles = json.loads(output.getvalue())
     assert exit_code == 0
     assert client.decode_calls == [
-        (["https://news.google.com/rss/articles/python"], {"delay": 0})
+        (
+            ["https://news.google.com/rss/articles/python"],
+            {"timeout": 30.0, "delay": 0},
+        )
     ]
     assert articles[0]["link"] == "https://example.com/python"
     assert articles[0]["google_link"] == "https://news.google.com/rss/articles/python"
@@ -509,6 +512,56 @@ def test_cli_normalize_adds_fields_to_csv(monkeypatch, tmp_path):
     assert exit_code == 0
     content = output_path.read_text(encoding="utf-8")
     assert "published_datetime,source_domain" in content
+
+
+def test_cli_extract_text_adds_text_to_json_and_csv(monkeypatch):
+    install_fake_client(monkeypatch)
+    outputs = []
+
+    class FakeEnricher:
+        def __init__(self, client, **kwargs):
+            assert kwargs == {"delay": 0}
+
+        def enrich(self, articles, **kwargs):
+            assert kwargs == {"decode_links": False, "extract_text": True}
+            return [{**article, "text": "Article text"} for article in articles]
+
+    monkeypatch.setattr(cli, "ArticleEnricher", FakeEnricher)
+
+    for output_format in ("json", "csv"):
+        output = io.StringIO()
+        exit_code = cli.main(
+            ["search", "python", "--extract-text", "--format", output_format],
+            output=output,
+        )
+        assert exit_code == 0
+        outputs.append(output.getvalue())
+
+    assert '"text": "Article text"' in outputs[0]
+    assert "google_link,text" in outputs[1]
+    assert "Article text" in outputs[1]
+
+
+def test_cli_extract_text_reports_missing_extra(monkeypatch):
+    install_fake_client(monkeypatch)
+    error = io.StringIO()
+
+    class MissingExtra:
+        def __init__(self, client, **kwargs):
+            pass
+
+        def enrich(self, articles, **kwargs):
+            raise RuntimeError(
+                'Article extraction is not installed. Install it with: '
+                'pip install "google-news-api[extract]"'
+            )
+
+    monkeypatch.setattr(cli, "ArticleEnricher", MissingExtra)
+
+    exit_code = cli.main(["search", "python", "--extract-text"], error=error)
+
+    assert exit_code == 1
+    assert 'pip install "google-news-api[extract]"' in error.getvalue()
 
 
 def test_cli_deduplicate_flag(monkeypatch):

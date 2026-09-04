@@ -1632,11 +1632,17 @@ def test_searchapi_light_mode(monkeypatch):
     monkeypatch.setenv("SEARCHAPI_API_KEY", "test-key")
 
     def mock_get(url, params=None, timeout=None, **kwargs):
-        assert params["engine"] == "google_news_light"
-        assert params["q"] == "python"
-        assert params["api_key"] == "test-key"
-        assert params["gl"] == "us"
-        assert params["hl"] == "en"
+        assert params == {
+            "engine": "google_news_light",
+            "q": "python",
+            "api_key": "test-key",
+            "utm_source": "Github",
+            "utm_medium": "sponsorship",
+            "utm_campaign": "google_news_api",
+            "utm_content": "ma2za/google-news-api",
+            "gl": "us",
+            "hl": "en",
+        }
         return httpx.Response(
             200,
             json={
@@ -1677,10 +1683,16 @@ def test_searchapi_portal_mode(monkeypatch):
     monkeypatch.setenv("SEARCHAPI_API_KEY", "test-key")
 
     def mock_get(url, params=None, timeout=None, **kwargs):
-        assert params["engine"] == "google_news_portal"
-        assert params["q"] == "python"
-        assert params["api_key"] == "test-key"
-        assert params["ceid"] == "US:en"
+        assert params == {
+            "engine": "google_news_portal",
+            "q": "python",
+            "api_key": "test-key",
+            "utm_source": "Github",
+            "utm_medium": "sponsorship",
+            "utm_campaign": "google_news_api",
+            "utm_content": "ma2za/google-news-api",
+            "ceid": "US:en",
+        }
         return httpx.Response(
             200,
             json={
@@ -1722,7 +1734,17 @@ async def test_async_searchapi_light_mode(monkeypatch):
     async with AsyncGoogleNewsClient() as client:
 
         async def mock_get(url, params=None, timeout=None, **kwargs):
-            assert params["engine"] == "google_news_light"
+            assert params == {
+                "engine": "google_news_light",
+                "q": "python",
+                "api_key": "test-key",
+                "utm_source": "Github",
+                "utm_medium": "sponsorship",
+                "utm_campaign": "google_news_api",
+                "utm_content": "ma2za/google-news-api",
+                "gl": "us",
+                "hl": "en",
+            }
             return httpx.Response(
                 200,
                 json={

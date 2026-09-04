@@ -13,14 +13,14 @@ from typing import Dict, Iterable, List, Optional, Sequence, TextIO
 
 from . import __version__
 from .client import GoogleNewsClient
-from .exceptions import GoogleNewsError
+from .enrichment import ArticleEnricher
+from .exceptions import ConfigurationError, GoogleNewsError
 from .providers import VALID_SEARCH_MODES
 from .results import deduplicate_articles, normalize_articles, sort_articles
-from .types import Article, EnrichedArticle
+from .types import Article
 
 OUTPUT_FIELDS = ("title", "source", "published", "link")
 CSV_FIELDS = ("title", "source", "published", "link", "summary", "id", "google_link")
-NORMALIZED_CSV_FIELDS = (*CSV_FIELDS, "published_datetime", "source_domain")
 
 
 class _DateTimeEncoder(json.JSONEncoder):
@@ -107,6 +107,7 @@ def _add_common_options(parser: argparse.ArgumentParser) -> None:
         dest="output_format",
     )
     parser.add_argument("--decode-links", action="store_true")
+    parser.add_argument("--extract-text", action="store_true")
     parser.add_argument("--deduplicate", action="store_true")
     parser.add_argument("--sort", choices=("newest", "oldest"))
     parser.add_argument("--normalize", action="store_true")
@@ -119,24 +120,21 @@ def _add_domain_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--exclude-domain", action="append", dest="exclude_domains")
 
 
-def _decode_articles(
-    client: GoogleNewsClient, articles: List[Article]
-) -> List[EnrichedArticle]:
-    urls = [article["link"] for article in articles if article.get("link")]
-    decoded_urls = client.decode_urls(urls, delay=0)
-    decoded_by_url = dict(zip(urls, decoded_urls))
-
-    enriched_articles: List[EnrichedArticle] = []
-    for article in articles:
-        enriched = dict(article)
-        link = article.get("link")
-        decoded_url = decoded_by_url.get(link) if link else None
-        if decoded_url:
-            enriched["google_link"] = link
-            enriched["link"] = decoded_url
-        enriched_articles.append(enriched)
-
-    return enriched_articles
+def _enrich_articles(
+    args: argparse.Namespace,
+    client: GoogleNewsClient,
+    articles: List[Article],
+) -> List[Article]:
+    if not args.decode_links and not args.extract_text:
+        return articles
+    try:
+        return ArticleEnricher(client, delay=0).enrich(
+            articles,
+            decode_links=args.decode_links,
+            extract_text=args.extract_text,
+        )
+    except RuntimeError as e:
+        raise ConfigurationError(str(e)) from e
 
 
 def _process_articles(
@@ -159,9 +157,7 @@ def _write_json(articles: Iterable[Article], output: TextIO) -> None:
 def _write_csv(
     args: argparse.Namespace, articles: Iterable[Article], output: TextIO
 ) -> None:
-    fieldnames = (
-        NORMALIZED_CSV_FIELDS if getattr(args, "normalize", False) else CSV_FIELDS
-    )
+    fieldnames = _csv_fields(args)
     writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
     writer.writeheader()
     for article in articles:
@@ -174,6 +170,15 @@ def _write_csv(
             if isinstance(row["published_datetime"], datetime):
                 row["published_datetime"] = row["published_datetime"].isoformat()
         writer.writerow(row)
+
+
+def _csv_fields(args: argparse.Namespace):
+    fieldnames = CSV_FIELDS
+    if getattr(args, "extract_text", False):
+        fieldnames = (*fieldnames, "text")
+    if getattr(args, "normalize", False):
+        fieldnames = (*fieldnames, "published_datetime", "source_domain")
+    return fieldnames
 
 
 def _write_table(articles: Iterable[Article], output: TextIO) -> None:
@@ -217,7 +222,7 @@ def _write_batch_articles(
         return
 
     if args.output_format == "csv":
-        base_fields = NORMALIZED_CSV_FIELDS if args.normalize else CSV_FIELDS
+        base_fields = _csv_fields(args)
         fieldnames = ("query", *base_fields)
         writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
@@ -298,8 +303,7 @@ def _run(args: argparse.Namespace, output: TextIO) -> None:
 
             processed_results = {}
             for query, articles in results.items():
-                if args.decode_links:
-                    articles = _decode_articles(client, articles)  # type: ignore
+                articles = _enrich_articles(args, client, articles)
                 articles = _process_articles(args, articles)
                 processed_results[query] = articles
 
@@ -317,8 +321,7 @@ def _run(args: argparse.Namespace, output: TextIO) -> None:
                 mode=args.mode,
             )
 
-        if args.decode_links:
-            articles = _decode_articles(client, articles)  # type: ignore
+        articles = _enrich_articles(args, client, articles)
 
         articles = _process_articles(args, articles)
         _write_articles(args, articles, output)

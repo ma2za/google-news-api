@@ -34,7 +34,7 @@ jobs:
           smoke_dir="$(mktemp -d)"
           cd "$smoke_dir"
           package_version="$(python -c "from importlib.metadata import version; print(version('google-news-api'))")"
-          python -c "from importlib.resources import files; from google_news_api import Article, EnrichedArticle, GoogleNewsClient; import google_news_api.mcp_server; assert files('google_news_api').joinpath('py.typed').is_file(); print(GoogleNewsClient, Article, EnrichedArticle)"
+          python -c "from importlib.resources import files; from google_news_api import Article, ArticleEnricher, AsyncArticleEnricher, EnrichedArticle, GoogleNewsClient; import google_news_api.mcp_server; assert files('google_news_api').joinpath('py.typed').is_file(); print(GoogleNewsClient, ArticleEnricher, AsyncArticleEnricher, Article, EnrichedArticle)"
           test "$(google-news --version)" = "google-news $package_version"
           google-news --help
           python -m pip check
@@ -112,8 +112,19 @@ jobs:
           (
             cd /tmp
             package_version="$(/tmp/google-news-api-base/bin/python -c "from importlib.metadata import version; print(version('google-news-api'))")"
-            /tmp/google-news-api-base/bin/python -c "from importlib import metadata; from importlib.resources import files; import importlib.util; from google_news_api import __version__; expected={'google-news':'google_news_api.cli:main','google-news-mcp':'google_news_api.mcp_server:main'}; actual={entry.name:entry.value for entry in metadata.entry_points(group='console_scripts') if entry.name in expected}; package=metadata.metadata('google-news-api'); assert actual == expected; assert metadata.version('google-news-api') == __version__; assert package['Requires-Python'] == '>=3.9'; assert package.get_all('Provides-Extra') == ['mcp']; assert files('google_news_api').joinpath('py.typed').is_file(); assert importlib.util.find_spec('mcp') is None"
+            /tmp/google-news-api-base/bin/python -c "from importlib import metadata; from importlib.resources import files; import importlib.util; from google_news_api import __version__; expected={'google-news':'google_news_api.cli:main','google-news-mcp':'google_news_api.mcp_server:main'}; actual={entry.name:entry.value for entry in metadata.entry_points(group='console_scripts') if entry.name in expected}; package=metadata.metadata('google-news-api'); assert actual == expected; assert metadata.version('google-news-api') == __version__; assert package['Requires-Python'] == '>=3.9'; assert package.get_all('Provides-Extra') == ['extract', 'mcp']; assert files('google_news_api').joinpath('py.typed').is_file(); assert importlib.util.find_spec('mcp') is None; assert importlib.util.find_spec('trafilatura') is None"
             test "$(/tmp/google-news-api-base/bin/google-news --version)" = "google-news $package_version"
+          )
+
+      - name: Smoke test extraction wheel installation
+        run: |
+          wheel_path="$(find dist -name 'google_news_api-*.whl' -print -quit)"
+          python -m venv /tmp/google-news-api-extract
+          /tmp/google-news-api-extract/bin/pip install "${wheel_path}[extract]"
+          /tmp/google-news-api-extract/bin/pip check
+          (
+            cd /tmp
+            /tmp/google-news-api-extract/bin/python -c "import trafilatura; from google_news_api import ArticleEnricher, AsyncArticleEnricher; print(ArticleEnricher, AsyncArticleEnricher)"
           )
 
       - name: Smoke test MCP wheel installation

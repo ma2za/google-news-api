@@ -7,26 +7,12 @@ from google_news_api import mcp_server
 
 
 class FakeResponse:
-    status = 200
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
-
-    async def text(self):
-        return "<html>article</html>"
+    status_code = 200
+    text = "<html>article</html>"
 
 
-class FakeSession:
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
-
-    def get(self, url):
+class FakeHTTPClient:
+    async def get(self, url, **kwargs):
         return FakeResponse()
 
 
@@ -37,6 +23,7 @@ class FakeClient:
         self.search_kwargs = None
         self.batch_search_kwargs = None
         self.top_news_kwargs = None
+        self.client = FakeHTTPClient()
 
     async def decode_urls(self, urls, **kwargs):
         self.decode_calls.append((urls, kwargs))
@@ -95,11 +82,6 @@ class FakeClient:
 
 
 def install_article_dependency_fakes(monkeypatch):
-    monkeypatch.setitem(
-        sys.modules,
-        "aiohttp",
-        SimpleNamespace(ClientSession=lambda: FakeSession()),
-    )
     monkeypatch.setitem(
         sys.modules,
         "trafilatura",
@@ -334,7 +316,7 @@ def test_mcp_server_entrypoint_reports_missing_extra(monkeypatch, capsys):
     def missing_dependencies():
         raise RuntimeError(mcp_server.MCP_EXTRA_INSTALL_MESSAGE)
 
-    monkeypatch.setattr(mcp_server, "_load_article_dependencies", missing_dependencies)
+    monkeypatch.setattr(mcp_server, "_load_extractor", missing_dependencies)
 
     with pytest.raises(SystemExit) as exc_info:
         mcp_server.main()

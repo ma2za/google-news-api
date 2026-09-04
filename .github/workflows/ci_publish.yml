@@ -66,6 +66,14 @@ jobs:
             "$RUNNER_TEMP/sdist-smoke/bin/python" -m pip check
           )
 
+          python -m venv "$RUNNER_TEMP/extract-smoke"
+          "$RUNNER_TEMP/extract-smoke/bin/python" -m pip install "${wheel_path}[extract]"
+          (
+            cd "$RUNNER_TEMP"
+            "$RUNNER_TEMP/extract-smoke/bin/python" -c "import trafilatura; from google_news_api import ArticleEnricher, AsyncArticleEnricher; print(ArticleEnricher, AsyncArticleEnricher)"
+            "$RUNNER_TEMP/extract-smoke/bin/python" -m pip check
+          )
+
           "$RUNNER_TEMP/wheel-smoke/bin/python" -m pip install "${wheel_path}[mcp]"
           (
             cd "$RUNNER_TEMP"

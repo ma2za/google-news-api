@@ -3,7 +3,12 @@ import inspect
 from feedparser import FeedParserDict
 
 import google_news_api
-from google_news_api import AsyncGoogleNewsClient, GoogleNewsClient
+from google_news_api import (
+    ArticleEnricher,
+    AsyncArticleEnricher,
+    AsyncGoogleNewsClient,
+    GoogleNewsClient,
+)
 
 
 def _parameters(callable_object):
@@ -20,7 +25,9 @@ def _parameters(callable_object):
 def test_public_exports_are_stable():
     assert set(google_news_api.__all__) == {
         "Article",
+        "ArticleEnricher",
         "AsyncCache",
+        "AsyncArticleEnricher",
         "AsyncGoogleNewsClient",
         "AsyncRateLimiter",
         "Cache",
@@ -56,6 +63,26 @@ def test_client_constructor_contract_is_stable():
 
     assert _parameters(GoogleNewsClient) == expected
     assert _parameters(AsyncGoogleNewsClient) == expected
+
+
+def test_article_enricher_contract():
+    constructor = (
+        ("client", "POSITIONAL_OR_KEYWORD", inspect.Parameter.empty),
+        ("max_concurrent", "KEYWORD_ONLY", 5),
+        ("timeout", "KEYWORD_ONLY", 30.0),
+        ("delay", "KEYWORD_ONLY", 1.0),
+    )
+    enrich = (
+        ("self", "POSITIONAL_OR_KEYWORD", inspect.Parameter.empty),
+        ("articles", "POSITIONAL_OR_KEYWORD", inspect.Parameter.empty),
+        ("decode_links", "KEYWORD_ONLY", True),
+        ("extract_text", "KEYWORD_ONLY", False),
+    )
+
+    assert _parameters(ArticleEnricher) == constructor
+    assert _parameters(AsyncArticleEnricher) == constructor
+    assert _parameters(ArticleEnricher.enrich) == enrich
+    assert _parameters(AsyncArticleEnricher.enrich) == enrich
 
 
 def test_search_contract_is_stable():

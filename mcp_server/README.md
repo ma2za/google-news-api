@@ -104,6 +104,11 @@ result = await client.top_news(
 ## Dependencies
 - FastMCP
 - AsyncGoogleNewsClient
+- Trafilatura through the shared `AsyncArticleEnricher`
+
+Extraction does not bypass paywalls, authentication, robots controls, or
+publisher blocking. A failure to fetch or extract one article does not discard
+the remaining results.
 
 ## Running the Server
 On Python 3.10 or newer, install the package with MCP dependencies and run the
