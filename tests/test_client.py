@@ -1636,10 +1636,6 @@ def test_searchapi_light_mode(monkeypatch):
             "engine": "google_news_light",
             "q": "python",
             "api_key": "test-key",
-            "utm_source": "Github",
-            "utm_medium": "sponsorship",
-            "utm_campaign": "google_news_api",
-            "utm_content": "ma2za/google-news-api",
             "gl": "us",
             "hl": "en",
         }
@@ -1687,10 +1683,6 @@ def test_searchapi_portal_mode(monkeypatch):
             "engine": "google_news_portal",
             "q": "python",
             "api_key": "test-key",
-            "utm_source": "Github",
-            "utm_medium": "sponsorship",
-            "utm_campaign": "google_news_api",
-            "utm_content": "ma2za/google-news-api",
             "ceid": "US:en",
         }
         return httpx.Response(
@@ -1738,10 +1730,6 @@ async def test_async_searchapi_light_mode(monkeypatch):
                 "engine": "google_news_light",
                 "q": "python",
                 "api_key": "test-key",
-                "utm_source": "Github",
-                "utm_medium": "sponsorship",
-                "utm_campaign": "google_news_api",
-                "utm_content": "ma2za/google-news-api",
                 "gl": "us",
                 "hl": "en",
             }
