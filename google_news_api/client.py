@@ -17,7 +17,7 @@ import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import quote, urlencode, urlparse
 
 import feedparser
@@ -26,6 +26,7 @@ from feedparser import FeedParserDict
 from selectolax.parser import HTMLParser
 from tqdm import tqdm
 
+from .config import ClientConfig
 from .exceptions import (
     ConfigurationError,
     HTTPError,
@@ -40,8 +41,6 @@ from .utils import (
     AsyncRateLimiter,
     Cache,
     RateLimiter,
-    retry_async,
-    retry_sync,
 )
 
 logger = logging.getLogger(__name__)
@@ -130,6 +129,13 @@ class BaseGoogleNewsClient(ABC):
         country: str = "US",
         requests_per_minute: int = 60,
         cache_ttl: int = 300,
+        *,
+        timeout: float = 30.0,
+        max_retries: int = 3,
+        retry_backoff: float = 2.0,
+        proxy: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        transport: Optional[Any] = None,
     ) -> None:
         """
         Initialize the Google News API client.
@@ -155,11 +161,36 @@ class BaseGoogleNewsClient(ABC):
             self.language_full = f"{language.lower()}-{country.upper()}"
         self.language_base = language.split("-")[0].lower()
         self.country = country.upper()
-        self._setup_rate_limiter_and_cache(requests_per_minute, cache_ttl)
+        self.max_retries = max_retries
+        self.retry_backoff = retry_backoff
+        self._setup_rate_limiter_and_cache(
+            requests_per_minute, cache_ttl, timeout, proxy, headers, transport
+        )
+
+    @classmethod
+    def from_config(cls, config: ClientConfig):
+        return cls(
+            language=config.language,
+            country=config.country,
+            requests_per_minute=config.requests_per_minute,
+            cache_ttl=config.cache_ttl,
+            timeout=config.timeout,
+            max_retries=config.max_retries,
+            retry_backoff=config.retry_backoff,
+            proxy=config.proxy,
+            headers=config.headers,
+            transport=config.transport,
+        )
 
     @abstractmethod
     def _setup_rate_limiter_and_cache(
-        self, requests_per_minute: int, cache_ttl: int
+        self,
+        requests_per_minute: int,
+        cache_ttl: int,
+        timeout: float,
+        proxy: Optional[str],
+        headers: Optional[Dict[str, str]],
+        transport: Optional[Any],
     ) -> None:
         pass
 
@@ -523,19 +554,33 @@ class GoogleNewsClient(BaseGoogleNewsClient):
     """Synchronous client for Google News RSS feed API."""
 
     def _setup_rate_limiter_and_cache(
-        self, requests_per_minute: int, cache_ttl: int
+        self,
+        requests_per_minute: int,
+        cache_ttl: int,
+        timeout: float,
+        proxy: Optional[str],
+        headers: Optional[Dict[str, str]],
+        transport: Optional[Any],
     ) -> None:
-        """Set up rate limiter and cache.
-
-        Args:
-            requests_per_minute: Maximum number of requests per minute
-            cache_ttl: Cache time-to-live in seconds
-        """
+        """Set up rate limiter and cache."""
         self._rate_limiter = RateLimiter(requests_per_minute)
         self._cache = Cache(ttl=cache_ttl)
-        self._client = httpx.Client(
-            follow_redirects=True, timeout=30.0, headers=CHROME_HEADERS
-        )
+
+        final_headers = dict(CHROME_HEADERS)
+        if headers:
+            final_headers.update(headers)
+
+        kwargs: Dict[str, Any] = {
+            "follow_redirects": True,
+            "timeout": timeout,
+            "headers": final_headers,
+        }
+        if proxy is not None:
+            kwargs["proxy"] = proxy
+        if transport is not None:
+            kwargs["transport"] = transport
+
+        self._client = httpx.Client(**kwargs)
 
     def __init__(
         self,
@@ -543,6 +588,13 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         country: str = "US",
         requests_per_minute: int = 60,
         cache_ttl: int = 300,
+        *,
+        timeout: float = 30.0,
+        max_retries: int = 3,
+        retry_backoff: float = 2.0,
+        proxy: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        transport: Optional[Any] = None,
     ) -> None:
         """Initialize the client.
 
@@ -552,7 +604,18 @@ class GoogleNewsClient(BaseGoogleNewsClient):
             requests_per_minute: Maximum number of requests per minute
             cache_ttl: Cache time-to-live in seconds
         """
-        super().__init__(language, country, requests_per_minute, cache_ttl)
+        super().__init__(
+            language,
+            country,
+            requests_per_minute,
+            cache_ttl,
+            timeout=timeout,
+            max_retries=max_retries,
+            retry_backoff=retry_backoff,
+            proxy=proxy,
+            headers=headers,
+            transport=transport,
+        )
 
     def __del__(self) -> None:
         """Clean up resources."""
@@ -571,15 +634,15 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         """Close the underlying HTTP client."""
         self._client.close()
 
-    @retry_sync(exceptions=(HTTPError, RateLimitError), max_retries=3, backoff=2.0)
     def _fetch_feed(self, url: str) -> FeedParserDict:
-        cached = self._cache.get(url)
-        if cached is not None:
-            return cached
+        for attempt in range(self.max_retries + 1):
+            cached = self._cache.get(url)
+            if cached is not None:
+                return cached
 
-        with self._rate_limiter:
             try:
-                response = self._client.get(url)
+                with self._rate_limiter:
+                    response = self._client.get(url)
 
                 if response.status_code == 429:
                     retry_after = _parse_retry_after(
@@ -600,9 +663,6 @@ class GoogleNewsClient(BaseGoogleNewsClient):
 
                 feed = feedparser.parse(response.text)
 
-                # feedparser sets bozo for recoverable defects too (undefined
-                # entities, encoding mismatches) while still extracting usable
-                # entries. Only treat bozo as fatal when nothing was parsed.
                 if feed.bozo and not feed.entries:
                     raise ParsingError(
                         "Failed to parse feed",
@@ -618,8 +678,43 @@ class GoogleNewsClient(BaseGoogleNewsClient):
                 self._cache.set(url, feed)
                 return feed
 
-            except httpx.RequestError as e:
-                raise HTTPError(f"Request failed: {str(e)}")
+            except (httpx.RequestError, httpx.TimeoutException) as e:
+                if attempt == self.max_retries:
+                    raise HTTPError(f"Request failed: {str(e)}") from e
+                wait_time = self.retry_backoff * (2**attempt)
+                wait_time += random.uniform(0, 0.1 * wait_time)
+                logger.warning(
+                    f"Request failed, retrying in {wait_time:.2f}s",
+                    extra={"attempt": attempt + 1, "error": str(e)},
+                )
+                time.sleep(wait_time)
+            except RateLimitError as e:
+                if attempt == self.max_retries:
+                    raise
+                wait_time = (
+                    e.retry_after
+                    if e.retry_after is not None
+                    else self.retry_backoff * (2**attempt)
+                )
+                wait_time += random.uniform(0, 0.1 * wait_time)
+                logger.warning(
+                    f"Rate limit exceeded, retrying in {wait_time:.2f}s",
+                    extra={"attempt": attempt + 1, "error": str(e)},
+                )
+                time.sleep(wait_time)
+            except HTTPError as e:
+                if e.status_code in {500, 502, 503, 504}:
+                    if attempt == self.max_retries:
+                        raise
+                    wait_time = self.retry_backoff * (2**attempt)
+                    wait_time += random.uniform(0, 0.1 * wait_time)
+                    logger.warning(
+                        f"Transient HTTP error, retrying in {wait_time:.2f}s",
+                        extra={"attempt": attempt + 1, "error": str(e)},
+                    )
+                    time.sleep(wait_time)
+                else:
+                    raise
 
     def search(
         self,
@@ -996,13 +1091,32 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
     """Asynchronous client for Google News RSS feed API."""
 
     def _setup_rate_limiter_and_cache(
-        self, requests_per_minute: int, cache_ttl: int
+        self,
+        requests_per_minute: int,
+        cache_ttl: int,
+        timeout: float,
+        proxy: Optional[str],
+        headers: Optional[Dict[str, str]],
+        transport: Optional[Any],
     ) -> None:
         self.rate_limiter = AsyncRateLimiter(requests_per_minute)
         self.cache = AsyncCache(ttl=cache_ttl)
-        self.client = httpx.AsyncClient(
-            follow_redirects=True, timeout=30.0, headers=CHROME_HEADERS
-        )
+
+        final_headers = dict(CHROME_HEADERS)
+        if headers:
+            final_headers.update(headers)
+
+        kwargs: Dict[str, Any] = {
+            "follow_redirects": True,
+            "timeout": timeout,
+            "headers": final_headers,
+        }
+        if proxy is not None:
+            kwargs["proxy"] = proxy
+        if transport is not None:
+            kwargs["transport"] = transport
+
+        self.client = httpx.AsyncClient(**kwargs)
 
     async def __aenter__(self) -> "AsyncGoogleNewsClient":
         """Enter the context manager."""
@@ -1016,7 +1130,6 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         """Close the client."""
         await self.client.aclose()
 
-    @retry_async(exceptions=(HTTPError, RateLimitError), max_retries=3, backoff=2.0)
     async def _fetch_feed(self, url: str) -> FeedParserDict:
         cached = await self.cache.get(url)
         if cached is not None:

@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import asdict, dataclass
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from .exceptions import ConfigurationError
 
@@ -54,6 +54,12 @@ class ClientConfig:
         requests_per_minute: Maximum number of requests per minute
         cache_ttl: Cache time-to-live in seconds
         log_config: Logging configuration
+        timeout: Request timeout in seconds
+        max_retries: Maximum number of retries for transient errors
+        retry_backoff: Initial backoff in seconds for retries
+        proxy: Optional proxy URL
+        headers: Optional dictionary of HTTP headers
+        transport: Optional httpx transport instance
     """
 
     language: str = "en"
@@ -61,13 +67,20 @@ class ClientConfig:
     requests_per_minute: int = 60
     cache_ttl: int = 300
     log_config: Optional[LogConfig] = None
+    timeout: float = 30.0
+    max_retries: int = 3
+    retry_backoff: float = 2.0
+    proxy: Optional[str] = None
+    headers: Optional[Dict[str, str]] = None
+    transport: Optional[Any] = None
 
     def __post_init__(self) -> None:
         """Validate client configuration.
 
         Raises:
             ConfigurationError: If any configuration values are invalid
-            ValueError: If numeric values are not positive
+            ValueError: If numeric values are not valid or conflicting fields
+                are provided
         """
         # Validate language code
         if not isinstance(self.language, str):
@@ -104,11 +117,21 @@ class ClientConfig:
             raise ValueError("requests_per_minute must be positive")
         if self.cache_ttl <= 0:
             raise ValueError("cache_ttl must be positive")
+        if self.timeout <= 0:
+            raise ValueError("timeout must be positive")
+        if self.retry_backoff <= 0:
+            raise ValueError("retry_backoff must be positive")
+        if self.max_retries < 0:
+            raise ValueError("max_retries must be non-negative")
+
+        # Validate proxy and transport are not both provided
+        if self.proxy is not None and self.transport is not None:
+            raise ValueError("proxy and transport cannot be used together")
 
         if self.log_config is None:
             self.log_config = LogConfig()
 
-    def as_dict(self) -> Dict[str, str]:
+    def as_dict(self) -> Dict[str, Any]:
         """Convert configuration to dictionary.
 
         Returns:
