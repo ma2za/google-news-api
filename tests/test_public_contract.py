@@ -59,6 +59,12 @@ def test_client_constructor_contract_is_stable():
         ("country", "POSITIONAL_OR_KEYWORD", "US"),
         ("requests_per_minute", "POSITIONAL_OR_KEYWORD", 60),
         ("cache_ttl", "POSITIONAL_OR_KEYWORD", 300),
+        ("timeout", "KEYWORD_ONLY", 30.0),
+        ("max_retries", "KEYWORD_ONLY", 3),
+        ("retry_backoff", "KEYWORD_ONLY", 2.0),
+        ("proxy", "KEYWORD_ONLY", None),
+        ("headers", "KEYWORD_ONLY", None),
+        ("transport", "KEYWORD_ONLY", None),
     )
 
     assert _parameters(GoogleNewsClient) == expected
