@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.0.20 - 2026-09-11
+
+### Added
+
+- Configurable HTTP networking parameters (`timeout`, `max_retries`, `retry_backoff`, `proxy`, `headers`, `transport`) on `ClientConfig`, `GoogleNewsClient`, and `AsyncGoogleNewsClient`.
+- Factory method `from_config(config)` on clients to build clients directly from a configuration object.
+- Built-in, transparent retries for HTTP 5xx transient errors and HTTP 429 rate limits respecting the `Retry-After` header.
+
 ## 0.0.19 - 2026-08-30
 
 ### Added
