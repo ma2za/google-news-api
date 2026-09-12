@@ -36,12 +36,7 @@ from .exceptions import (
 )
 from .providers import DEFAULT_MODE, SEARCHAPI_PROVIDER, validate_mode
 from .types import Article
-from .utils import (
-    AsyncCache,
-    AsyncRateLimiter,
-    Cache,
-    RateLimiter,
-)
+from .utils import AsyncCache, AsyncRateLimiter, Cache, RateLimiter
 
 logger = logging.getLogger(__name__)
 
