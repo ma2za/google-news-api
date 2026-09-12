@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.0.21 - 2026-09-12
+
+### Fixed
+
+- Resolved remote pipeline formatting errors for `black` and `isort`.
+
 ## 0.0.20 - 2026-09-11
 
 ### Added
