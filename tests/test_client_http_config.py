@@ -1,7 +1,9 @@
-import pytest
 import httpx
-from google_news_api import GoogleNewsClient, AsyncGoogleNewsClient, ClientConfig
+import pytest
+
+from google_news_api import AsyncGoogleNewsClient, ClientConfig, GoogleNewsClient
 from google_news_api.client import CHROME_HEADERS
+
 
 def test_client_config_defaults():
     client = GoogleNewsClient()
@@ -9,7 +11,8 @@ def test_client_config_defaults():
     assert client.retry_backoff == 2.0
     assert client._client.timeout.read == 30.0
     assert client._client.headers["User-Agent"] == CHROME_HEADERS["User-Agent"]
-    
+
+
 def test_client_config_custom():
     headers = {"X-Custom": "test", "User-Agent": "my-agent"}
     client = GoogleNewsClient(
@@ -26,12 +29,14 @@ def test_client_config_custom():
     assert client._client.headers["User-Agent"] == "my-agent"
     assert client._client.headers["Accept"] == CHROME_HEADERS["Accept"]
 
+
 def test_from_config():
     config = ClientConfig(timeout=10.0, max_retries=5)
     client = GoogleNewsClient.from_config(config)
     assert client.max_retries == 5
     assert client._client.timeout.read == 10.0
-    
+
+
 @pytest.mark.asyncio
 async def test_async_client_config_custom():
     transport = httpx.MockTransport(lambda request: httpx.Response(200, content=b""))
