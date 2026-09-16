@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, TextIO
@@ -92,6 +93,35 @@ def _parser() -> argparse.ArgumentParser:
     )
     _add_common_options(location)
 
+    watch = subparsers.add_parser("watch", help="Watch for new articles")
+    watch.add_argument("query")
+    _add_common_options(watch)
+    watch.add_argument("--after")
+    watch.add_argument("--before")
+    watch.add_argument("--when")
+    _add_domain_options(watch)
+    _add_query_options(watch)
+
+    watch.add_argument(
+        "--interval", type=int, default=300, help="Polling interval in seconds"
+    )
+    watch.add_argument("--state", help="Path to state file")
+    watch.add_argument("--once", action="store_true", help="Perform one poll and exit")
+    watch.add_argument(
+        "--emit-existing",
+        action="store_true",
+        help="Emit first-poll results instead of just seeding state",
+    )
+    watch.add_argument(
+        "--max-seen", type=int, default=10000, help="Max items to store in state"
+    )
+    watch.add_argument(
+        "--reset-state",
+        action="store_true",
+        help="Replace the named state file on start",
+    )
+    watch.set_defaults(output_format="jsonl")
+
     return parser
 
 
@@ -102,7 +132,7 @@ def _add_common_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--mode", choices=VALID_SEARCH_MODES, default="default")
     parser.add_argument(
         "--format",
-        choices=("table", "json", "csv"),
+        choices=("table", "json", "csv", "jsonl"),
         default="table",
         dest="output_format",
     )
@@ -152,6 +182,11 @@ def _process_articles(
 def _write_json(articles: Iterable[Article], output: TextIO) -> None:
     json.dump(list(articles), output, indent=2)
     output.write("\n")
+
+
+def _write_jsonl(articles: Iterable[Article], output: TextIO) -> None:
+    for article in articles:
+        output.write(json.dumps(article, cls=_DateTimeEncoder) + "\n")
 
 
 def _write_csv(
@@ -207,10 +242,19 @@ def _write_articles(
 ) -> None:
     if args.output_format == "json":
         _write_json(articles, output)
+    elif args.output_format == "jsonl":
+        _write_jsonl(articles, output)
     elif args.output_format == "csv":
         _write_csv(args, articles, output)
     else:
         _write_table(articles, output)
+
+
+def _write_batch_jsonl(results: Dict[str, List[Article]], output: TextIO) -> None:
+    for query, articles in results.items():
+        for article in articles:
+            row = {"query": query, **article}
+            output.write(json.dumps(row, cls=_DateTimeEncoder) + "\n")
 
 
 def _write_batch_articles(
@@ -219,6 +263,10 @@ def _write_batch_articles(
     if args.output_format == "json":
         json.dump(results, output, indent=2, cls=_DateTimeEncoder)
         output.write("\n")
+        return
+
+    if args.output_format == "jsonl":
+        _write_batch_jsonl(results, output)
         return
 
     if args.output_format == "csv":
@@ -359,6 +407,122 @@ def _write_output_file(path: Path, content: str, force: bool) -> None:
         raise
 
 
+def _run_watch(args: argparse.Namespace, output: TextIO, error: TextIO) -> int:
+    from google_news_api.query import NewsQuery
+    from google_news_api.monitor import ArticleTracker
+    import time
+
+    if args.interval < 10:
+        print("google-news: --interval must be at least 10", file=error)
+        return 1
+
+    if not args.state and not args.once:
+        print("google-news: --state is required unless --once is used", file=error)
+        return 1
+
+    out_file = None
+    out_stream = output
+    if args.output and args.output != "-":
+        output_path = Path(args.output)
+        mode = "w" if getattr(args, "force", False) else "x"
+        try:
+            out_file = open(output_path, mode, encoding="utf-8", newline="")
+            out_stream = out_file
+        except FileExistsError:
+            print(f"google-news: output file already exists: {output_path}", file=error)
+            return 1
+        except OSError as e:
+            print(f"google-news: {e}", file=error)
+            return 1
+
+    temp_state_file = None
+    try:
+        if args.state:
+            state_path = Path(args.state)
+            if args.reset_state and state_path.exists():
+                state_path.unlink()
+            tracker = ArticleTracker(str(args.state), max_seen=args.max_seen)
+        else:
+            temp_state_file = tempfile.NamedTemporaryFile(delete=False)
+            temp_state_file.close()
+            os.unlink(temp_state_file.name)
+            tracker = ArticleTracker(temp_state_file.name, max_seen=args.max_seen)
+
+        with GoogleNewsClient(language=args.language, country=args.country) as client:
+            query = NewsQuery(
+                text=args.query,
+                exact_phrase=getattr(args, "exact_phrase", None),
+                any_words=getattr(args, "any_word", None),
+                exclude_words=getattr(args, "exclude_word", None),
+                in_title=getattr(args, "in_title", None),
+            ).build()
+
+            if getattr(args, "show_query", False):
+                print(query, file=error)
+
+            fingerprint = query
+
+            first_poll = True
+            while True:
+                try:
+                    articles = client.search(
+                        query,
+                        after=args.after,
+                        before=args.before,
+                        when=args.when,
+                        max_results=args.max_results,
+                        mode=args.mode,
+                        include_domains=args.include_domains,
+                        exclude_domains=args.exclude_domains,
+                    )
+
+                    new_articles = tracker.filter_new(
+                        articles,
+                        fingerprint=fingerprint,
+                        emit_existing=args.emit_existing,
+                    )
+
+                    if new_articles:
+                        new_articles = _enrich_articles(args, client, new_articles)
+                        new_articles = _process_articles(args, new_articles)
+                        _write_articles(args, new_articles, out_stream)
+                        out_stream.flush()
+
+                    first_poll = False
+                except ValueError as e:
+                    print(f"google-news: {e}", file=error)
+                    if out_file:
+                        out_file.close()
+                    return 1
+                except Exception as e:
+                    print(f"google-news: poll error: {e}", file=error)
+
+                if args.once:
+                    break
+
+                try:
+                    time.sleep(args.interval)
+                except KeyboardInterrupt:
+                    return 130
+
+    except ConfigurationError as e:
+        print(f"google-news: {e}", file=error)
+        return 1
+    except GoogleNewsError as e:
+        print(f"google-news: {e}", file=error)
+        return 1
+    except Exception as e:
+        print(f"google-news: {e}", file=error)
+        return 1
+    finally:
+        if out_file:
+            out_file.close()
+        if temp_state_file and os.path.exists(temp_state_file.name):
+            os.unlink(temp_state_file.name)
+
+    return 0
+
+
 def main(
     argv: Optional[Sequence[str]] = None,
     output: TextIO = sys.stdout,
@@ -366,6 +530,10 @@ def main(
 ) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
+
+    if args.command == "watch":
+        return _run_watch(args, output, error)
+
     try:
         if args.output is None or args.output == "-":
             _run(args, output)

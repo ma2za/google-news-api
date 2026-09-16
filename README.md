@@ -84,6 +84,27 @@ google-news search "python" \
   --show-query
 ```
 
+Monitor a topic for new coverage:
+
+```bash
+# Run in a terminal to poll every 5 minutes and append new articles
+google-news watch "semiconductor supply chain" \
+  --when 24h \
+  --interval 300 \
+  --state .news-state.json \
+  --format jsonl \
+  --output new-articles.jsonl
+
+# Run once in a cron job, emitting only unseen articles since the last run
+google-news watch "semiconductor supply chain" \
+  --when 24h \
+  --once \
+  --state .news-state.json \
+  --format jsonl \
+  --output new-articles.jsonl \
+  --force
+```
+
 Export machine-readable results as JSON or CSV:
 
 ```bash
