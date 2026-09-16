@@ -1,7 +1,9 @@
-import pytest
 import io
 import json
 from pathlib import Path
+
+import pytest
+
 from google_news_api import cli
 from google_news_api.client import GoogleNewsClient
 from google_news_api.monitor import ArticleTracker

@@ -1,17 +1,17 @@
 """Tests for the watch command in the google-news command-line interface."""
 
+import argparse
 import io
 import json
 import os
-import argparse
 from pathlib import Path
 from unittest import mock
 
 import pytest
 
 from google_news_api import cli
-from google_news_api.monitor import ArticleTracker
 from google_news_api.exceptions import GoogleNewsError
+from google_news_api.monitor import ArticleTracker
 
 # Define some dummy articles
 ARTICLES_1 = [
