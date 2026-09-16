@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.0.22 - 2026-09-16
+
+### Added
+
+- Added `google-news watch` command for incremental monitoring of queries using state files and polling.
+- Added `ArticleTracker` class to `google_news_api.monitor` for filtering out already-seen articles across script runs.
+- Added `jsonl` (JSON Lines) output format to the CLI via `--format jsonl`.
+
 ## 0.0.21 - 2026-09-12
 
 ### Fixed
