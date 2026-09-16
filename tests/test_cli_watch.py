@@ -1,3 +1,5 @@
+import time
+
 """Tests for the watch command in the google-news command-line interface."""
 
 import io
@@ -119,7 +121,7 @@ def test_watch_second_poll_emits_unseen(monkeypatch, tmp_path):
         if client.polls == 2:
             raise KeyboardInterrupt()
 
-    monkeypatch.setattr(cli.time, "sleep", fake_sleep)
+    monkeypatch.setattr(time, "sleep", fake_sleep)
 
     output = io.StringIO()
     state_file = tmp_path / "state.db"
@@ -146,7 +148,7 @@ def test_watch_failed_poll_does_not_stop_loop(monkeypatch, tmp_path):
         if client.polls == 3:
             raise KeyboardInterrupt()
 
-    monkeypatch.setattr(cli.time, "sleep", fake_sleep)
+    monkeypatch.setattr(time, "sleep", fake_sleep)
 
     output = io.StringIO()
     error = io.StringIO()
