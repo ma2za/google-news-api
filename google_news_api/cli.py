@@ -408,9 +408,10 @@ def _write_output_file(path: Path, content: str, force: bool) -> None:
 
 
 def _run_watch(args: argparse.Namespace, output: TextIO, error: TextIO) -> int:
-    from google_news_api.query import NewsQuery
-    from google_news_api.monitor import ArticleTracker
     import time
+
+    from google_news_api.monitor import ArticleTracker
+    from google_news_api.query import NewsQuery
 
     if args.interval < 10:
         print("google-news: --interval must be at least 10", file=error)
