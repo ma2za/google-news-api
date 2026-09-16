@@ -7,7 +7,6 @@ import json
 import os
 import sys
 import tempfile
-import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, TextIO
@@ -463,7 +462,6 @@ def _run_watch(args: argparse.Namespace, output: TextIO, error: TextIO) -> int:
 
             fingerprint = query
 
-            first_poll = True
             while True:
                 try:
                     articles = client.search(
@@ -489,7 +487,6 @@ def _run_watch(args: argparse.Namespace, output: TextIO, error: TextIO) -> int:
                         _write_articles(args, new_articles, out_stream)
                         out_stream.flush()
 
-                    first_poll = False
                 except ValueError as e:
                     print(f"google-news: {e}", file=error)
                     if out_file:
