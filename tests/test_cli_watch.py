@@ -1,17 +1,10 @@
 """Tests for the watch command in the google-news command-line interface."""
 
-import argparse
 import io
 import json
-import os
-from pathlib import Path
-from unittest import mock
-
-import pytest
 
 from google_news_api import cli
 from google_news_api.exceptions import GoogleNewsError
-from google_news_api.monitor import ArticleTracker
 
 # Define some dummy articles
 ARTICLES_1 = [
@@ -160,7 +153,6 @@ def test_watch_failed_poll_does_not_stop_loop(monkeypatch, tmp_path):
     state_file = tmp_path / "state.db"
 
     # Set up client to fail on the second poll
-    client_init_called = False
     original_init = FakeWatchClient.__init__
 
     def new_init(self, *args, **kwargs):

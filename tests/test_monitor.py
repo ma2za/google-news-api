@@ -105,7 +105,8 @@ def test_bounded_state_eviction(temp_state_path):
     # Should only keep the last 3 items: "id:3", "id:4", "id:5"
     assert state["identities"] == ["id:3", "id:4", "id:5"]
 
-    # If we filter again, "id:1" is not in the seen set anymore, so it should be emitted as new!
+    # If we filter again, "id:1" is not in the seen set anymore,
+    # so it should be emitted as new!
     new_articles = tracker.filter_new(
         [{"id": "1"}, {"id": "4"}, {"id": "6"}], fingerprint="test_evict"
     )

@@ -1,5 +1,4 @@
 import io
-import json
 from pathlib import Path
 
 import pytest
@@ -11,7 +10,8 @@ from google_news_api.monitor import ArticleTracker
 
 @pytest.mark.integration
 def test_live_tracker_deduplication(tmp_path: Path):
-    """Test that ArticleTracker correctly identifies and deduplicates real live articles."""
+    """Test that ArticleTracker correctly identifies and deduplicates
+    real live articles."""
     state_file = tmp_path / "state.json"
     tracker = ArticleTracker(str(state_file), max_seen=100)
 

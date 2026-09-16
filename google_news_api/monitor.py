@@ -56,7 +56,8 @@ class ArticleTracker:
             saved_fingerprint = state.get("fingerprint")
             if saved_fingerprint != fingerprint:
                 raise ValueError(
-                    f"Fingerprint mismatch: expected {saved_fingerprint}, got {fingerprint}"
+                    f"Fingerprint mismatch: expected {saved_fingerprint}, "
+                    f"got {fingerprint}"
                 )
 
             seen_identities = state.get("identities", [])
