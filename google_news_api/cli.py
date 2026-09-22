@@ -17,7 +17,7 @@ from .enrichment import ArticleEnricher
 from .exceptions import ConfigurationError, GoogleNewsError
 from .providers import VALID_SEARCH_MODES
 from .results import deduplicate_articles, normalize_articles, sort_articles
-from .types import Article
+from .types import Article, ArticleCluster
 
 OUTPUT_FIELDS = ("title", "source", "published", "link")
 CSV_FIELDS = ("title", "source", "published", "link", "summary", "id", "google_link")
@@ -83,6 +83,12 @@ def _parser() -> argparse.ArgumentParser:
     top = subparsers.add_parser("top", help="Fetch top news by topic")
     top.add_argument("--topic", default="WORLD")
     _add_common_options(top)
+
+    clusters = subparsers.add_parser(
+        "clusters", help="Fetch top news articles as clusters with related coverage"
+    )
+    clusters.add_argument("--topic", default="WORLD")
+    _add_common_options(clusters)
 
     location = subparsers.add_parser(
         "location", help="Fetch news for a geographic location"
@@ -236,6 +242,52 @@ def _write_table(articles: Iterable[Article], output: TextIO) -> None:
         output.write("\n")
 
 
+def _write_clusters_json(clusters: Iterable[ArticleCluster], output: TextIO) -> None:
+    json.dump(list(clusters), output, indent=2, cls=_DateTimeEncoder)
+    output.write("\n")
+
+
+def _write_clusters_table(clusters: Iterable[ArticleCluster], output: TextIO) -> None:
+    rows = []
+    for cluster in clusters:
+        primary = cluster["primary"]
+        rows.append(
+            {
+                "title": str(primary.get("title") or ""),
+                "source": str(primary.get("source") or ""),
+                "published": str(primary.get("published") or ""),
+                "link": str(primary.get("link") or ""),
+            }
+        )
+        for rel in cluster["related"]:
+            rows.append(
+                {
+                    "title": f"  -> {rel.get('title') or ''}",
+                    "source": str(rel.get("source") or ""),
+                    "published": "",
+                    "link": str(rel.get("link") or ""),
+                }
+            )
+
+    if not rows:
+        return
+
+    widths = {
+        field: max([len(field), *(len(row[field]) for row in rows)])
+        for field in OUTPUT_FIELDS
+    }
+
+    header = "  ".join(field.upper().ljust(widths[field]) for field in OUTPUT_FIELDS)
+    separator = "  ".join("-" * widths[field] for field in OUTPUT_FIELDS)
+    output.write(f"{header}\n{separator}\n")
+
+    for row in rows:
+        output.write(
+            "  ".join(row[field].ljust(widths[field]) for field in OUTPUT_FIELDS)
+        )
+        output.write("\n")
+
+
 def _write_articles(
     args: argparse.Namespace, articles: List[Article], output: TextIO
 ) -> None:
@@ -355,6 +407,24 @@ def _run(args: argparse.Namespace, output: TextIO) -> None:
                 processed_results[query] = articles
 
             _write_batch_articles(args, processed_results, output)
+            return
+        elif args.command == "clusters":
+            if args.output_format in ("csv", "jsonl"):
+                from google_news_api.exceptions import ValidationError
+
+                raise ValidationError(
+                    "The 'clusters' command only supports 'table' and 'json' formats",
+                    field="output_format",
+                    value=args.output_format,
+                )
+            clusters = client.top_news_clusters(
+                topic=args.topic,
+                max_results=args.max_results,
+            )
+            if args.output_format == "json":
+                _write_clusters_json(clusters, output)
+            else:
+                _write_clusters_table(clusters, output)
             return
         elif args.command == "location":
             articles = client.location_news(

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.0.23 - 2026-09-22
+
+### Added
+
+- Added `top_news_clusters` method to `GoogleNewsClient` and `AsyncGoogleNewsClient` to parse and return related articles from Google News feed summaries without extra HTTP requests.
+- Added `RelatedArticle` and `ArticleCluster` TypedDicts for structured clusters of primary and related articles.
+- Added `clusters` subcommand to the CLI (`google-news clusters`), supporting `table` and `json` output formats with aligned, indented formatting of related coverage.
+- Added `top_news_clusters` tool to the MCP server with opt-in link decoding and a strict request amplification guard limiting queries.
+
 ## 0.0.22 - 2026-09-16
 
 ### Added

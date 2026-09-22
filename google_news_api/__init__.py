@@ -23,7 +23,13 @@ from .results import (
     sort_articles,
     source_domain,
 )
-from .types import Article, EnrichedArticle, NormalizedArticle
+from .types import (
+    Article,
+    ArticleCluster,
+    EnrichedArticle,
+    NormalizedArticle,
+    RelatedArticle,
+)
 from .utils import AsyncCache, AsyncRateLimiter, Cache, RateLimiter
 
 try:
@@ -51,6 +57,8 @@ __all__ = [
     "Article",
     "EnrichedArticle",
     "NormalizedArticle",
+    "RelatedArticle",
+    "ArticleCluster",
     "deduplicate_articles",
     "normalize_article",
     "normalize_articles",

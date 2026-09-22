@@ -47,6 +47,21 @@ class FakeClient:
         self.top_news_kwargs = kwargs
         return [dict(article) for article in ARTICLES]
 
+    def top_news_clusters(self, **kwargs):
+        self.top_news_clusters_kwargs = kwargs
+        return [
+            {
+                "primary": dict(ARTICLES[0]),
+                "related": [
+                    {
+                        "title": "Related Article",
+                        "link": "https://news.google.com/rss/articles/related",
+                        "source": "Related Pub",
+                    }
+                ],
+            }
+        ]
+
     def location_news(self, **kwargs):
         self.location_news_kwargs = kwargs
         return [dict(article) for article in ARTICLES]
@@ -582,3 +597,77 @@ def test_cli_sort_flag(monkeypatch):
         ["search", "python", "--sort", "newest", "--format", "json"], output=output
     )
     assert exit_code == 0
+
+
+def test_cli_clusters_json(monkeypatch):
+    """The clusters command writes JSON output."""
+    install_fake_client(monkeypatch)
+    output = io.StringIO()
+
+    exit_code = cli.main(
+        [
+            "clusters",
+            "--topic",
+            "TECHNOLOGY",
+            "--max-results",
+            "3",
+            "--format",
+            "json",
+        ],
+        output=output,
+    )
+
+    assert exit_code == 0
+    client = FakeClient.instances[0]
+    assert client.top_news_clusters_kwargs == {
+        "topic": "TECHNOLOGY",
+        "max_results": 3,
+    }
+    data = json.loads(output.getvalue())
+    assert len(data) == 1
+    assert data[0]["primary"]["title"] == "Python News"
+    assert data[0]["related"][0]["title"] == "Related Article"
+
+
+def test_cli_clusters_table(monkeypatch):
+    """The clusters command writes indented table output."""
+    install_fake_client(monkeypatch)
+    output = io.StringIO()
+
+    exit_code = cli.main(
+        [
+            "clusters",
+            "--topic",
+            "TECHNOLOGY",
+            "--format",
+            "table",
+        ],
+        output=output,
+    )
+
+    assert exit_code == 0
+    content = output.getvalue()
+    assert "TITLE" in content
+    assert "Python News" in content
+    assert "  -> Related Article" in content
+
+
+def test_cli_clusters_invalid_format(monkeypatch):
+    """The clusters command rejects csv and jsonl output formats."""
+    install_fake_client(monkeypatch)
+    error = io.StringIO()
+
+    exit_code = cli.main(
+        [
+            "clusters",
+            "--format",
+            "csv",
+        ],
+        error=error,
+    )
+
+    assert exit_code == 1
+    assert (
+        "The 'clusters' command only supports 'table' and 'json' formats"
+        in error.getvalue()
+    )

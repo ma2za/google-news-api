@@ -35,6 +35,8 @@ def test_public_exports_are_stable():
         "ConfigurationError",
         "EnrichedArticle",
         "NormalizedArticle",
+        "RelatedArticle",
+        "ArticleCluster",
         "GoogleNewsClient",
         "GoogleNewsError",
         "HTTPError",
@@ -118,6 +120,17 @@ def test_top_news_contract_is_stable():
 
     assert _parameters(GoogleNewsClient.top_news) == expected
     assert _parameters(AsyncGoogleNewsClient.top_news) == expected
+
+
+def test_top_news_clusters_contract_is_stable():
+    expected = (
+        ("self", "POSITIONAL_OR_KEYWORD", inspect.Parameter.empty),
+        ("topic", "POSITIONAL_OR_KEYWORD", "WORLD"),
+        ("max_results", "KEYWORD_ONLY", None),
+    )
+
+    assert _parameters(GoogleNewsClient.top_news_clusters) == expected
+    assert _parameters(AsyncGoogleNewsClient.top_news_clusters) == expected
 
 
 def test_location_news_contract_is_stable():

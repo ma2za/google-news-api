@@ -53,6 +53,27 @@ class FakeClient:
             }
         ]
 
+    async def top_news_clusters(self, **kwargs):
+        self.top_news_clusters_kwargs = kwargs
+        return [
+            {
+                "primary": {
+                    "title": "Primary Title",
+                    "link": "https://news.google.com/rss/articles/primary",
+                    "published": "2026-01-01",
+                    "summary": "",
+                    "source": "Example",
+                },
+                "related": [
+                    {
+                        "title": "Related Title",
+                        "link": "https://news.google.com/rss/articles/related",
+                        "source": "Example Related",
+                    }
+                ],
+            }
+        ]
+
     async def location_news(self, **kwargs):
         self.location_news_kwargs = kwargs
         return [
@@ -265,6 +286,7 @@ def test_mcp_app_registers_batch_search(monkeypatch):
         "batch_news_search",
         "top_news",
         "location_news",
+        "top_news_clusters",
     ]
 
 
@@ -310,6 +332,59 @@ async def test_mcp_location_news(monkeypatch):
     assert result[0]["title"] == "Top"
     assert client.location_news_kwargs["location"] == "Chicago"
     assert client.location_news_kwargs["max_results"] == 2
+
+
+@pytest.mark.asyncio
+async def test_mcp_top_news_clusters(monkeypatch):
+    client = FakeClient()
+
+    async def get_client(language="en", country="US"):
+        return client
+
+    monkeypatch.setattr(mcp_server, "get_client", get_client)
+
+    result = await mcp_server.top_news_clusters(
+        topic="TECHNOLOGY",
+        max_results=5,
+        decode_links=False,
+    )
+
+    assert len(result) == 1
+    assert result[0]["primary"]["title"] == "Primary Title"
+    assert result[0]["related"][0]["title"] == "Related Title"
+    assert client.top_news_clusters_kwargs["topic"] == "TECHNOLOGY"
+    assert client.top_news_clusters_kwargs["max_results"] == 5
+
+
+@pytest.mark.asyncio
+async def test_mcp_top_news_clusters_decode(monkeypatch):
+    client = FakeClient(
+        decoded_urls=["https://example.com/primary", "https://example.com/related"]
+    )
+
+    async def get_client(language="en", country="US"):
+        return client
+
+    monkeypatch.setattr(mcp_server, "get_client", get_client)
+
+    result = await mcp_server.top_news_clusters(
+        topic="TECHNOLOGY",
+        max_results=5,
+        decode_links=True,
+    )
+
+    assert len(result) == 1
+    # Verify primary and related links are decoded
+    assert result[0]["primary"]["link"] == "https://example.com/primary"
+    assert (
+        result[0]["primary"]["google_link"]
+        == "https://news.google.com/rss/articles/primary"
+    )
+    assert result[0]["related"][0]["link"] == "https://example.com/related"
+    assert client.decode_calls[0][0] == [
+        "https://news.google.com/rss/articles/primary",
+        "https://news.google.com/rss/articles/related",
+    ]
 
 
 def test_mcp_server_entrypoint_reports_missing_extra(monkeypatch, capsys):

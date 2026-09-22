@@ -1,7 +1,7 @@
 """Public result types for Google News API clients."""
 
 from datetime import datetime
-from typing import Optional, TypedDict
+from typing import List, Optional, TypedDict
 
 
 class Article(TypedDict):
@@ -21,3 +21,14 @@ class EnrichedArticle(Article, total=False):
 class NormalizedArticle(Article, total=False):
     published_datetime: Optional[datetime]
     source_domain: Optional[str]
+
+
+class RelatedArticle(TypedDict):
+    title: Optional[str]
+    link: Optional[str]
+    source: Optional[str]
+
+
+class ArticleCluster(TypedDict):
+    primary: Article
+    related: List[RelatedArticle]
