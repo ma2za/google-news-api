@@ -2,6 +2,7 @@
 
 import pytest
 from feedparser import FeedParserDict
+
 from google_news_api.client import AsyncGoogleNewsClient, GoogleNewsClient
 
 
