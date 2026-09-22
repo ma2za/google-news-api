@@ -35,7 +35,7 @@ from .exceptions import (
     ValidationError,
 )
 from .providers import DEFAULT_MODE, SEARCHAPI_PROVIDER, validate_mode
-from .types import Article
+from .types import Article, ArticleCluster
 from .utils import AsyncCache, AsyncRateLimiter, Cache, RateLimiter
 
 logger = logging.getLogger(__name__)
@@ -487,6 +487,87 @@ class BaseGoogleNewsClient(ABC):
             for entry in articles
         ]
 
+    def _parse_article_clusters(
+        self, feed: FeedParserDict, max_results: Optional[int] = None
+    ) -> List[ArticleCluster]:
+        if max_results == 0:
+            return []
+        limit = max_results if max_results and max_results > 0 else None
+        articles = feed.entries[:limit] if limit else feed.entries
+
+        clusters = []
+        for entry in articles:
+            primary: Article = {
+                "title": self._get_entry_field(entry, "title"),
+                "link": self._get_entry_field(entry, "link"),
+                "published": self._get_entry_field(entry, "published"),
+                "summary": entry.get("summary", ""),
+                "source": entry.source.title if "source" in entry else None,
+                "id": self._get_article_id(entry),
+            }
+
+            related = []
+            summary_html = primary["summary"]
+            if summary_html:
+                try:
+                    parser = HTMLParser(summary_html)
+                    raw_related = []
+                    for li in parser.css("li"):
+                        a = li.css_first("a")
+                        if not a:
+                            continue
+                        link = a.attributes.get("href")
+                        title = a.text(strip=True)
+
+                        # Skip story/cluster links
+                        if "/stories/" in (link or ""):
+                            continue
+
+                        font = li.css_first("font")
+                        source = font.text(strip=True) if font else None
+
+                        # Skip if it is the primary article
+                        if primary["link"] and link == primary["link"]:
+                            continue
+
+                        raw_related.append(
+                            {
+                                "title": title or None,
+                                "link": link or None,
+                                "source": source or None,
+                            }
+                        )
+
+                    # Deduplicate related entries by link, then normalized title
+                    seen_links = set()
+                    seen_titles = set()
+                    for item in raw_related:
+                        link = item["link"]
+                        title = item["title"]
+                        if link:
+                            if link in seen_links:
+                                continue
+                            seen_links.add(link)
+                        if title:
+                            norm_title = "".join(title.split()).lower()
+                            if norm_title in seen_titles:
+                                continue
+                            seen_titles.add(norm_title)
+                        related.append(item)
+                except Exception as e:
+                    # Related parsing failure returns an empty related list
+                    logger.error(f"Failed to parse related articles: {str(e)}")
+                    related = []
+
+            clusters.append(
+                {
+                    "primary": primary,
+                    "related": related,
+                }
+            )
+
+        return clusters
+
     @staticmethod
     def _get_entry_field(entry: FeedParserDict, field: str) -> Optional[str]:
         """Read an optional entry field from dict keys or attributes."""
@@ -875,6 +956,18 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         url = self._build_url(path)
         feed = self._fetch_feed(url)
         return self._parse_articles(feed, max_results)
+
+    def top_news_clusters(
+        self,
+        topic: str = "WORLD",
+        *,
+        max_results: Optional[int] = None,
+    ) -> List[ArticleCluster]:
+        """Get top news article clusters (with related coverage) for a topic."""
+        path = self._get_topic_path(topic)
+        url = self._build_url(path)
+        feed = self._fetch_feed(url)
+        return self._parse_article_clusters(feed, max_results)
 
     def location_news(
         self,
@@ -1371,6 +1464,20 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         url = self._build_url(path)
         feed = await self._fetch_feed(url)
         return self._parse_articles(feed, max_results)
+
+    async def top_news_clusters(
+        self,
+        topic: str = "WORLD",
+        *,
+        max_results: Optional[int] = None,
+    ) -> List[ArticleCluster]:
+        """Get top news article clusters (with related coverage) for a topic
+        asynchronously.
+        """
+        path = self._get_topic_path(topic)
+        url = self._build_url(path)
+        feed = await self._fetch_feed(url)
+        return self._parse_article_clusters(feed, max_results)
 
     async def location_news(
         self,

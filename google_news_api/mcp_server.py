@@ -184,6 +184,58 @@ async def location_news(
         return [{"error": f"Failed to fetch location news: {str(e)}"}]
 
 
+async def top_news_clusters(
+    topic: str = "WORLD",
+    max_results: Optional[int] = None,
+    language: str = "en",
+    country: str = "US",
+    decode_links: bool = False,
+) -> List[dict[str, Any]]:
+    """Fetch top news articles as clusters (with related coverage) for a topic."""
+    client = await get_client(language, country)
+    try:
+        clusters = await client.top_news_clusters(
+            topic=topic,
+            max_results=max_results,
+        )
+
+        # Optional link decoding with request amplification guard
+        if decode_links:
+            urls_to_decode = []
+            # Cap clusters to enrich to 5 to protect against N+1 amplification
+            clusters_to_enrich = clusters[:5]
+
+            for cluster in clusters_to_enrich:
+                if cluster["primary"].get("link"):
+                    urls_to_decode.append(cluster["primary"]["link"])
+                for rel in cluster["related"]:
+                    if rel.get("link"):
+                        urls_to_decode.append(rel["link"])
+
+            # Deduplicate URLs
+            unique_urls = list(dict.fromkeys(urls_to_decode))
+            # Strict cap of 15 total URLs to decode
+            unique_urls = unique_urls[:15]
+
+            if unique_urls:
+                decoded_list = await client.decode_urls(unique_urls)
+                decoded_map = dict(zip(unique_urls, decoded_list))
+
+                for cluster in clusters:
+                    primary = cluster["primary"]
+                    if primary.get("link") in decoded_map:
+                        primary["google_link"] = primary["link"]
+                        primary["link"] = decoded_map[primary["link"]]
+
+                    for rel in cluster["related"]:
+                        if rel.get("link") in decoded_map:
+                            rel["link"] = decoded_map[rel["link"]]
+
+        return clusters  # type: ignore
+    except Exception as e:
+        return [{"error": f"Failed to fetch top news clusters: {str(e)}"}]
+
+
 def create_mcp_app():
     FastMCP = _load_fastmcp()
     mcp = FastMCP("googlenews")
@@ -191,6 +243,7 @@ def create_mcp_app():
     mcp.tool()(batch_news_search)
     mcp.tool()(top_news)
     mcp.tool()(location_news)
+    mcp.tool()(top_news_clusters)
     return mcp
 
 
