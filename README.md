@@ -39,6 +39,25 @@ for article in articles:
     print(article["link"])
 ```
 
+## Google News MCP Server
+
+Install the optional MCP server for local agent integrations:
+
+```bash
+pip install "google-news-api[mcp]"
+google-news-mcp
+```
+
+The default transport is stdio. For a local Streamable HTTP endpoint, use:
+
+```bash
+google-news-mcp --transport streamable-http --host 127.0.0.1 --port 8000
+```
+
+Connect clients to `http://127.0.0.1:8000/mcp`. Keep the server on localhost;
+use a trusted reverse proxy for any network exposure. See
+[mcp_server/README.md](mcp_server/README.md) for configuration and tools.
+
 ## Command Line
 
 The package also installs a `google-news` command for quick searches and

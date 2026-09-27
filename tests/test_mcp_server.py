@@ -266,7 +266,7 @@ def test_mcp_app_registers_batch_search(monkeypatch):
     registered = []
 
     class FakeMCP:
-        def __init__(self, name):
+        def __init__(self, name, **kwargs):
             self.name = name
 
         def tool(self):
@@ -287,6 +287,7 @@ def test_mcp_app_registers_batch_search(monkeypatch):
         "top_news",
         "location_news",
         "top_news_clusters",
+        "server_info",
     ]
 
 
@@ -392,9 +393,69 @@ def test_mcp_server_entrypoint_reports_missing_extra(monkeypatch, capsys):
         raise RuntimeError(mcp_server.MCP_EXTRA_INSTALL_MESSAGE)
 
     monkeypatch.setattr(mcp_server, "_load_extractor", missing_dependencies)
+    monkeypatch.setattr(sys, "argv", ["google-news-mcp"])
 
     with pytest.raises(SystemExit) as exc_info:
         mcp_server.main()
 
     assert exc_info.value.code == 1
     assert 'pip install "google-news-api[mcp]"' in capsys.readouterr().err
+
+
+@pytest.mark.asyncio
+async def test_server_info_is_network_free():
+    info = await mcp_server.server_info()
+
+    assert info["transports"] == ["stdio", "streamable-http"]
+    assert info["features"]["clusters"] is True
+
+
+@pytest.mark.asyncio
+async def test_client_cache_is_bounded_and_shutdown_closes_clients(monkeypatch):
+    created = []
+
+    class CachedClient:
+        def __init__(self, **kwargs):
+            self.closed = False
+            created.append(self)
+
+        async def aclose(self):
+            self.closed = True
+
+    monkeypatch.setattr(mcp_server, "AsyncGoogleNewsClient", CachedClient)
+    mcp_server._clients.clear()
+    for number in range(mcp_server._CLIENT_CACHE_SIZE + 1):
+        await mcp_server.get_client(country=f"C{number}")
+
+    assert len(mcp_server._clients) == mcp_server._CLIENT_CACHE_SIZE
+    assert created[0].closed is True
+    await mcp_server.shutdown()
+    assert all(client.closed for client in created)
+
+
+def test_mcp_server_cli_forwards_http_settings(monkeypatch):
+    called = {}
+
+    class App:
+        def run(self, **kwargs):
+            called["run"] = kwargs
+
+    monkeypatch.setattr(mcp_server, "_load_extractor", lambda: None)
+    monkeypatch.setattr(
+        mcp_server,
+        "create_mcp_app",
+        lambda host, port: called.update(host=host, port=port) or App(),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["google-news-mcp", "--transport", "streamable-http", "--port", "8123"],
+    )
+
+    mcp_server.main()
+
+    assert called == {
+        "host": "127.0.0.1",
+        "port": 8123,
+        "run": {"transport": "streamable-http"},
+    }
