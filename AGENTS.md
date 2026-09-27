@@ -1,8 +1,8 @@
 # Agent instructions
 
 This is the canonical project context for every coding agent. Read it before
-assessing, planning, or changing the repository. removed-provider-specific context may
-exist locally, but no agent may rely on removed-provider discovery alone.
+assessing, planning, or changing the repository. Agent-specific local context
+may exist, but no agent may rely on a particular tool's discovery alone.
 
 ## Mandatory context discovery
 
