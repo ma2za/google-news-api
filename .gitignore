@@ -178,8 +178,8 @@ cython_debug/
 
 *.json
 
-# Gemini
-.gemini/
-GEMINI.md
+# Private maintainer configuration
+.agents/PRIVATE_RELEASE_PLAN.md
+.agents/.env
 .tmp/
 .pytest_temp/

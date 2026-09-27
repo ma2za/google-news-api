@@ -13,7 +13,5 @@ portable workflows.
 - `commands/release-prepare.md`: portable release-candidate preparation prompt.
 - `commands/release-verify.md`: portable release verification prompt.
 
-Gemini still reads the root `GEMINI.md` and `.gemini/commands/`, but their
-shared instructions are mirrored here or in `../AGENTS.md` so other agents have
-the same context. `.gemini/.env` remains private environment configuration and
-must not be copied into prompts, logs, commits, or agent memory.
+Private environment configuration must not be copied into prompts, logs,
+commits, or agent memory.
