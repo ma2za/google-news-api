@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.0.24
+
+### Added
+
+- Add `google-news-mcp --transport streamable-http` with explicit localhost
+  host and validated port configuration; stdio remains the default.
+- Add a network-free `server_info` MCP tool with supported transports, topics,
+  and feature availability.
+- Bound cached locale clients and close them during MCP server shutdown.
+
+### Compatibility
+
+- Existing MCP tool names, arguments, defaults, and stdio invocation are
+  unchanged. Streamable HTTP is opt-in and binds to `127.0.0.1` by default.
+
 ## 0.0.23 - 2026-09-22
 
 ### Added

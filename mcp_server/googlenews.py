@@ -7,7 +7,10 @@ from google_news_api.mcp_server import (
     location_news,
     main,
     news_search,
+    server_info,
+    shutdown,
     top_news,
+    top_news_clusters,
 )
 
 __all__ = [
@@ -18,7 +21,10 @@ __all__ = [
     "main",
     "mcp",
     "news_search",
+    "server_info",
+    "shutdown",
     "top_news",
+    "top_news_clusters",
 ]
 
 try:

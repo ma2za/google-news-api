@@ -119,6 +119,28 @@ pip install "google-news-api[mcp]"
 google-news-mcp
 ```
 
+The default transport is stdio, suitable for local MCP clients that launch the
+command as a subprocess. Streamable HTTP is opt-in and binds only to localhost:
+
+```bash
+google-news-mcp --transport streamable-http --host 127.0.0.1 --port 8000
+```
+
+Its endpoint is `http://127.0.0.1:8000/mcp`. Do not expose it directly to a
+network: it has no authentication. Put a trusted reverse proxy in front of it
+if remote access is required. `--host` and `--port` are only valid with
+`--transport streamable-http`.
+
+Use `google-news-mcp --version` to verify the installed package. For
+headline-only operation, callers should set `decode_links=false` and
+`extract_text=false`; this avoids extra publisher-page requests. Extraction is
+optional and remains subject to publisher availability and access controls.
+
+### server_info
+
+`server_info` returns the package version, supported transports, topics, and
+available MCP features without making a network request.
+
 The packaged Python module is `google_news_api.mcp_server`.
 
 The source-tree compatibility wrapper still works for local development:

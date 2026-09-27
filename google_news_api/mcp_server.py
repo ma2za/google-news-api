@@ -1,9 +1,13 @@
 """Packaged MCP server for Google News API."""
 
+import argparse
 import asyncio
 import sys
+from collections import OrderedDict
+from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 
+from google_news_api import __version__
 from google_news_api.client import AsyncGoogleNewsClient
 from google_news_api.enrichment import AsyncArticleEnricher, _load_extractor
 
@@ -12,7 +16,8 @@ MCP_EXTRA_INSTALL_MESSAGE = (
     'pip install "google-news-api[mcp]"'
 )
 
-_clients: dict[tuple[str, str], AsyncGoogleNewsClient] = {}
+_CLIENT_CACHE_SIZE = 16
+_clients: OrderedDict[tuple[str, str], AsyncGoogleNewsClient] = OrderedDict()
 
 
 def _missing_mcp_extra(error: ImportError) -> RuntimeError:
@@ -33,11 +38,48 @@ async def get_client(
     language: str = "en", country: str = "US"
 ) -> AsyncGoogleNewsClient:
     key = (language, country)
-    if key not in _clients:
+    if key in _clients:
+        _clients.move_to_end(key)
+    else:
         _clients[key] = AsyncGoogleNewsClient(
             language=language, country=country, requests_per_minute=60, cache_ttl=300
         )
+        if len(_clients) > _CLIENT_CACHE_SIZE:
+            _, evicted = _clients.popitem(last=False)
+            await evicted.aclose()
     return _clients[key]
+
+
+async def shutdown() -> None:
+    clients = list(_clients.values())
+    _clients.clear()
+    await asyncio.gather(*(client.aclose() for client in clients))
+
+
+@asynccontextmanager
+async def _lifespan(_: Any):
+    try:
+        yield
+    finally:
+        await shutdown()
+
+
+async def server_info() -> dict[str, Any]:
+    return {
+        "version": __version__,
+        "transports": ["stdio", "streamable-http"],
+        "topics": [
+            "WORLD",
+            "NATION",
+            "BUSINESS",
+            "TECHNOLOGY",
+            "ENTERTAINMENT",
+            "SPORTS",
+            "SCIENCE",
+            "HEALTH",
+        ],
+        "features": {"location": True, "clusters": True, "enrichment": True},
+    }
 
 
 async def _enrich_articles(
@@ -236,22 +278,37 @@ async def top_news_clusters(
         return [{"error": f"Failed to fetch top news clusters: {str(e)}"}]
 
 
-def create_mcp_app():
+def create_mcp_app(host: str = "127.0.0.1", port: int = 8000):
     FastMCP = _load_fastmcp()
-    mcp = FastMCP("googlenews")
+    mcp = FastMCP("googlenews", host=host, port=port, lifespan=_lifespan)
     mcp.tool()(news_search)
     mcp.tool()(batch_news_search)
     mcp.tool()(top_news)
     mcp.tool()(location_news)
     mcp.tool()(top_news_clusters)
+    mcp.tool()(server_info)
     return mcp
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(prog="google-news-mcp")
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
+    )
+    parser.add_argument(
+        "--transport", choices=("stdio", "streamable-http"), default="stdio"
+    )
+    parser.add_argument("--host")
+    parser.add_argument("--port", type=int)
+    args = parser.parse_args()
+    if args.transport == "stdio" and (args.host is not None or args.port is not None):
+        parser.error("--host and --port require --transport streamable-http")
+    if args.port is not None and not 1 <= args.port <= 65535:
+        parser.error("--port must be between 1 and 65535")
     try:
         _load_extractor()
-        mcp = create_mcp_app()
+        mcp = create_mcp_app(args.host or "127.0.0.1", args.port or 8000)
     except (ImportError, RuntimeError) as e:
         print(MCP_EXTRA_INSTALL_MESSAGE, file=sys.stderr)
         raise SystemExit(1) from e
-    mcp.run(transport="stdio")
+    mcp.run(transport=args.transport)
