@@ -26,10 +26,10 @@ def print_news_section(title: str, articles: list) -> None:
         print("-" * len(title))
 
 
-async def main():
+async def main(client_es=None, client_en=None):
     """Execute the main async function to demonstrate Google News API usage."""
-    # Initialize the client with Spanish language and Spain as country
-    async with AsyncGoogleNewsClient(language="es", country="ES") as client:
+
+    async def run_es(client):
         try:
             # Get top news from Spain
             top_news = await client.top_news(max_results=5)
@@ -46,7 +46,14 @@ async def main():
         except Exception as e:
             print(f"Error: {e}")
 
-    async with AsyncGoogleNewsClient(language="en", country="US") as client:
+    if client_es is not None:
+        await run_es(client_es)
+    else:
+        # Initialize the client with Spanish language and Spain as country
+        async with AsyncGoogleNewsClient(language="es", country="ES") as client:
+            await run_es(client)
+
+    async def run_en(client):
         try:
             # Get technology news
             tech_news = await client.top_news(topic="TECHNOLOGY", max_results=5)
@@ -63,6 +70,12 @@ async def main():
 
         except Exception as e:
             print(f"Error: {e}")
+
+    if client_en is not None:
+        await run_en(client_en)
+    else:
+        async with AsyncGoogleNewsClient(language="en", country="US") as client:
+            await run_en(client)
 
 
 if __name__ == "__main__":

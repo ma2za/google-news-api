@@ -1,0 +1,58 @@
+site_name: Google News API
+site_url: https://ma2za.github.io/google-news-api/
+repo_url: https://github.com/ma2za/google-news-api
+site_description: Unofficial Python client for Google News RSS with sync, async, URL decoding, caching, and MCP support.
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+
+nav:
+  - Overview: index.md
+  - Compatibility Policy: compatibility.md
+  - Guides:
+      - First Search: guides/first_search.md
+      - Async Batch Research: guides/async_batch.md
+      - Geographic Headlines: guides/geographic_headlines.md
+      - Advanced Queries: guides/advanced_queries.md
+      - Clean Dataset Export: guides/clean_dataset_export.md
+      - Full-Text Enrichment: guides/full_text_enrichment.md
+      - Custom Transports & Proxies: guides/custom_transports.md
+      - Incremental Monitoring: guides/incremental_monitoring.md
+      - MCP Setup: guides/mcp_setup.md
+  - API Reference:
+      - Clients: reference/client.md
+      - Query Construction: reference/query.md
+      - Full-Text Enrichment: reference/enrichment.md
+      - Result Utilities: reference/results.md
+      - Data Types: reference/types.md
+      - Exceptions: reference/exceptions.md
+  - Maintainers:
+      - Release Checklist: releasing.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+strict: true

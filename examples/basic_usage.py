@@ -28,25 +28,22 @@ def print_article(article: Dict[str, Any]) -> None:
     print("=" * 50)
 
 
-def sync_example():
+def sync_example(client: Any = None) -> None:
     """Demonstrate synchronous client usage with examples."""
     print("\n=== Synchronous Client Example ===")
 
-    # Create a client
-    with GoogleNewsClient(
-        language="en", country="US", requests_per_minute=60, cache_ttl=300
-    ) as client:
+    def run_with(c: GoogleNewsClient) -> None:
         try:
             # Get top news
             print("\nFetching top news...")
-            articles = client.top_news(max_results=3)
+            articles = c.top_news(max_results=3)
             for article in articles:
                 print_article(article)
 
             # Search for a specific topic
             topic = "python programming"
             print(f"\nSearching for news about '{topic}'...")
-            articles = client.search(topic, max_results=3, when="1h")
+            articles = c.search(topic, max_results=3, when="1h")
             for article in articles:
                 print_article(article)
 
@@ -59,25 +56,31 @@ def sync_example():
         except Exception as e:
             print(f"An error occurred: {e}")
 
+    if client is not None:
+        run_with(client)
+    else:
+        with GoogleNewsClient(
+            language="en", country="US", requests_per_minute=60, cache_ttl=300
+        ) as new_client:
+            run_with(new_client)
 
-async def async_example():
+
+async def async_example(client: Any = None) -> None:
     """Demonstrate asynchronous client usage with examples."""
     print("\n=== Asynchronous Client Example ===")
 
-    async with AsyncGoogleNewsClient(
-        language="en", country="US", requests_per_minute=60, cache_ttl=300
-    ) as client:
+    async def run_with(c: AsyncGoogleNewsClient) -> None:
         try:
             # Get top news
             print("\nFetching top news...")
-            articles = await client.top_news(max_results=3)
+            articles = await c.top_news(max_results=3)
             for article in articles:
                 print_article(article)
 
             # Search for a specific topic
             topic = "python programming"
             print(f"\nSearching for news about '{topic}'...")
-            articles = await client.search(topic, max_results=3)
+            articles = await c.search(topic, max_results=3)
             for article in articles:
                 print_article(article)
 
@@ -89,6 +92,14 @@ async def async_example():
             print(f"Status code: {e.status_code}")
         except Exception as e:
             print(f"An error occurred: {e}")
+
+    if client is not None:
+        await run_with(client)
+    else:
+        async with AsyncGoogleNewsClient(
+            language="en", country="US", requests_per_minute=60, cache_ttl=300
+        ) as new_client:
+            await run_with(new_client)
 
 
 def main():
