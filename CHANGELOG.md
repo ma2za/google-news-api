@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+## 0.1.0 - 2026-10-04
+
+### Added
+
+- Complete MkDocs Material documentation site deployable to GitHub Pages with strict validation.
+- 9 executable, offline-tested guides covering basic search, async batching, geographic headlines, advanced queries, dataset export, full-text enrichment, custom transports, incremental monitoring, and MCP setup.
+- Comprehensive API reference documentation for clients, query construction, enrichment, result utilities, typed models, and exception classes.
+- Programmatic sync/async API parity test suite (`tests/test_parity.py`) enforcing identical signatures, arguments, defaults, and error behavior across `GoogleNewsClient` and `AsyncGoogleNewsClient`.
+- Fixture-based request-budget regression test suite (`tests/test_request_budget.py`) enforcing exact HTTP request limits on caching, batching, clustering, link decoding, and feed polling.
+- Offline characterization test suite for URL decoding (`tests/test_client_decoding.py`), elevating `client.py` branch coverage from 76% to 94% and total package branch coverage to 92%.
+- Offline test verification suite for all documented guide snippets and examples (`tests/test_examples_and_guides.py`).
+- Formalized semantic versioning guarantees and two-minor deprecation window in `docs/compatibility.md`.
+- `Documentation` URL added to project metadata in `pyproject.toml`.
+
+### Fixed
+
+- Eliminated unclosed file handler warnings during test execution by ensuring all `logging.FileHandler` instances are explicitly closed before unlinking temporary test files.
+- Refactored `examples/basic_usage.py` and `examples/advanced_usage.py` to allow optional client injection for network-free automated testing while maintaining interactive CLI behavior.
+
+### Compatibility
+
+- Strictly zero breaking changes: 100% backward compatible with `0.0.24`.
+
 ## 0.0.24
 
 ### Added

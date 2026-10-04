@@ -537,7 +537,9 @@ def test_logging_setup():
         assert log_data["message"] == "Test message"
         assert log_data["test_prop"] == "test_value"
     finally:
-        # Remove all handlers to release file
+        # Close and remove all handlers to release file
+        for handler in logger.handlers:
+            handler.close()
         logger.handlers = []
         # Cleanup
         os.unlink(tmp_name)
@@ -557,7 +559,9 @@ def test_logging_setup():
         assert "INFO" in log_line
         assert "Test message" in log_line
     finally:
-        # Remove all handlers to release file
+        # Close and remove all handlers to release file
+        for handler in logger.handlers:
+            handler.close()
         logger.handlers = []
         # Cleanup
         os.unlink(tmp_name)
@@ -567,6 +571,7 @@ def test_logging_setup():
 async def test_rate_limiter_logging():
     """Test that rate limiter logs warnings when limit is reached."""
     import logging
+    import time
 
     from google_news_api.utils import AsyncRateLimiter
 
@@ -583,8 +588,12 @@ async def test_rate_limiter_logging():
 
         limiter = AsyncRateLimiter(requests_per_minute=6000)
         limiter.tokens = 0
+        limiter.last_update = time.monotonic()
         async with limiter:
             pass
+
+        for handler in logger.handlers:
+            handler.flush()
 
         # Check log file
         with open(tmp_name, "r") as f:
@@ -594,7 +603,9 @@ async def test_rate_limiter_logging():
         assert log_data["level"] == "WARNING"
         assert "Rate limit reached, waiting" in log_data["message"]
     finally:
-        # Remove all handlers to release file
+        # Close and remove all handlers to release file
+        for handler in logger.handlers:
+            handler.close()
         logger.handlers = []
         # Cleanup
         os.unlink(tmp_name)
@@ -633,7 +644,9 @@ def test_log_with_props():
         assert log_data["operation"] == "test"
         assert log_data["component"] == "decorator"
     finally:
-        # Remove all handlers to release file
+        # Close and remove all handlers to release file
+        for handler in logger.handlers:
+            handler.close()
         logger.handlers = []
         # Cleanup
         os.unlink(tmp_name)
