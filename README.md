@@ -132,6 +132,7 @@ Export machine-readable results as JSON or CSV:
 ```bash
 google-news search "python" --format json
 google-news top --topic TECHNOLOGY --max-results 10 --format csv
+google-news top --topic-token CAAqKggKIiRDQkFTRF... --max-results 10 --format json
 ```
 
 Write any command directly to a UTF-8 file:
@@ -172,7 +173,7 @@ google-news search "artificial intelligence regulation" \
 | Capability | Support |
 |------------|---------|
 | Google News search | Keyword search through Google News RSS |
-| Top stories | Topic feeds for world, nation, business, technology, sports, science, health, and entertainment |
+| Top stories | Topic feeds for standard named topics and custom section tokens via `topic_token` |
 | Date filters | `after`, `before`, and relative `when` filters |
 | Domain filters | Include trusted publishers or exclude unwanted domains |
 | Sync and async clients | `GoogleNewsClient` and `AsyncGoogleNewsClient` |
@@ -214,7 +215,13 @@ Notes:
 from google_news_api import GoogleNewsClient
 
 with GoogleNewsClient(country="US", language="en") as client:
+    # Named topic
     articles = client.top_news(topic="TECHNOLOGY", max_results=10)
+
+    # Or custom section token from news.google.com/topics/<TOKEN>
+    custom_articles = client.top_news(
+        topic_token="CAAqKggKIiRDQkFTRF...", max_results=10
+    )
 ```
 
 ### Search With Time Filters

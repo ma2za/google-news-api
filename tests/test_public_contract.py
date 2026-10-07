@@ -114,6 +114,7 @@ def test_top_news_contract_is_stable():
     expected = (
         ("self", "POSITIONAL_OR_KEYWORD", inspect.Parameter.empty),
         ("topic", "POSITIONAL_OR_KEYWORD", "WORLD"),
+        ("topic_token", "KEYWORD_ONLY", None),
         ("max_results", "KEYWORD_ONLY", None),
         ("mode", "KEYWORD_ONLY", "default"),
     )
@@ -126,6 +127,7 @@ def test_top_news_clusters_contract_is_stable():
     expected = (
         ("self", "POSITIONAL_OR_KEYWORD", inspect.Parameter.empty),
         ("topic", "POSITIONAL_OR_KEYWORD", "WORLD"),
+        ("topic_token", "KEYWORD_ONLY", None),
         ("max_results", "KEYWORD_ONLY", None),
     )
 

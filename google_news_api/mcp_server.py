@@ -184,14 +184,18 @@ async def top_news(
     decode_links: bool = True,
     extract_text: bool = True,
     mode: str = "default",
+    topic_token: Optional[str] = None,
 ) -> List[dict[str, Any]]:
     client = await get_client(language, country)
     try:
-        articles = await client.top_news(
-            topic=topic,
-            max_results=max_results,
-            mode=mode,
-        )
+        kwargs: dict[str, Any] = {
+            "topic": topic,
+            "max_results": max_results,
+            "mode": mode,
+        }
+        if topic_token is not None:
+            kwargs["topic_token"] = topic_token
+        articles = await client.top_news(**kwargs)
         return await _enrich_articles(
             client,
             articles,
@@ -232,14 +236,18 @@ async def top_news_clusters(
     language: str = "en",
     country: str = "US",
     decode_links: bool = False,
+    topic_token: Optional[str] = None,
 ) -> List[dict[str, Any]]:
     """Fetch top news articles as clusters (with related coverage) for a topic."""
     client = await get_client(language, country)
     try:
-        clusters = await client.top_news_clusters(
-            topic=topic,
-            max_results=max_results,
-        )
+        kwargs: dict[str, Any] = {
+            "topic": topic,
+            "max_results": max_results,
+        }
+        if topic_token is not None:
+            kwargs["topic_token"] = topic_token
+        clusters = await client.top_news_clusters(**kwargs)
 
         # Optional link decoding with request amplification guard
         if decode_links:

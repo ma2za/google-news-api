@@ -444,6 +444,14 @@ class BaseGoogleNewsClient(ABC):
             }
             return f"{self.BASE_URL}headlines/section/{path}?{urlencode(params)}"
 
+        elif path.startswith("topics/"):
+            params = {
+                "hl": self.language_full,
+                "gl": self.country,
+                "ceid": f"{self.country}:{self.language_base}",
+            }
+            return f"{self.BASE_URL}{path}?{urlencode(params)}"
+
         elif path.startswith("geo/"):
             # For geographic headlines, we don't urlencode the path again
             # if it's already encoded correctly, but we need to ensure the
@@ -603,7 +611,40 @@ class BaseGoogleNewsClient(ABC):
 
         return None
 
-    def _get_topic_path(self, topic: str) -> str:
+    def _get_topic_path(
+        self, topic: str = "WORLD", *, topic_token: Optional[str] = None
+    ) -> str:
+        if topic_token is not None:
+            if not isinstance(topic_token, str):
+                raise ValidationError(
+                    "topic_token must be a non-empty string",
+                    field="topic_token",
+                    value=topic_token,
+                )
+            token = topic_token.strip()
+            if not token:
+                raise ValidationError(
+                    "topic_token must be a non-empty string",
+                    field="topic_token",
+                    value=topic_token,
+                )
+            if "://" in token or token.lower().startswith(
+                ("http://", "https://", "ftp://")
+            ):
+                raise ValidationError(
+                    "topic_token must be a section token, not a URL",
+                    field="topic_token",
+                    value=topic_token,
+                )
+            if not isinstance(topic, str) or topic.upper() != "WORLD":
+                raise ValidationError(
+                    "Cannot use 'topic_token' together with a custom 'topic'",
+                    field="topic_token",
+                    value=topic_token,
+                )
+            encoded_token = quote(token, safe="")
+            return f"topics/{encoded_token}"
+
         topic_map = {
             "WORLD": "WORLD",
             "NATION": "NATION",
@@ -615,15 +656,22 @@ class BaseGoogleNewsClient(ABC):
             "HEALTH": "HEALTH",
         }
 
-        topic = topic.upper()
-        if topic not in topic_map:
+        if not isinstance(topic, str):
             raise ValidationError(
                 f"Invalid topic. Must be one of: {', '.join(topic_map.keys())}",
                 field="topic",
                 value=topic,
             )
 
-        return f"topic/{topic_map[topic]}"
+        topic_key = topic.upper()
+        if topic_key not in topic_map:
+            raise ValidationError(
+                f"Invalid topic. Must be one of: {', '.join(topic_map.keys())}",
+                field="topic",
+                value=topic,
+            )
+
+        return f"topic/{topic_map[topic_key]}"
 
 
 class GoogleNewsClient(BaseGoogleNewsClient):
@@ -944,15 +992,22 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         self,
         topic: str = "WORLD",
         *,
+        topic_token: Optional[str] = None,
         max_results: Optional[int] = None,
         mode: str = DEFAULT_MODE,
     ) -> List[Article]:
-        """Get top news articles for a topic."""
+        """Get top news articles for a topic or custom section token."""
         validate_mode(mode)
+        if topic_token is not None and mode != DEFAULT_MODE:
+            raise ValidationError(
+                "topic_token is only supported in default RSS mode",
+                field="topic_token",
+                value=topic_token,
+            )
         if mode != DEFAULT_MODE:
             return self.search(topic, max_results=max_results, mode=mode)
 
-        path = self._get_topic_path(topic)
+        path = self._get_topic_path(topic, topic_token=topic_token)
         url = self._build_url(path)
         feed = self._fetch_feed(url)
         return self._parse_articles(feed, max_results)
@@ -961,10 +1016,13 @@ class GoogleNewsClient(BaseGoogleNewsClient):
         self,
         topic: str = "WORLD",
         *,
+        topic_token: Optional[str] = None,
         max_results: Optional[int] = None,
     ) -> List[ArticleCluster]:
-        """Get top news article clusters (with related coverage) for a topic."""
-        path = self._get_topic_path(topic)
+        """Get top news article clusters (with related coverage) for a topic
+        or custom section token.
+        """
+        path = self._get_topic_path(topic, topic_token=topic_token)
         url = self._build_url(path)
         feed = self._fetch_feed(url)
         return self._parse_article_clusters(feed, max_results)
@@ -1452,15 +1510,22 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         self,
         topic: str = "WORLD",
         *,
+        topic_token: Optional[str] = None,
         max_results: Optional[int] = None,
         mode: str = DEFAULT_MODE,
     ) -> List[Article]:
-        """Get top news articles for a topic asynchronously."""
+        """Get top news articles for a topic or custom section token asynchronously."""
         validate_mode(mode)
+        if topic_token is not None and mode != DEFAULT_MODE:
+            raise ValidationError(
+                "topic_token is only supported in default RSS mode",
+                field="topic_token",
+                value=topic_token,
+            )
         if mode != DEFAULT_MODE:
             return await self.search(topic, max_results=max_results, mode=mode)
 
-        path = self._get_topic_path(topic)
+        path = self._get_topic_path(topic, topic_token=topic_token)
         url = self._build_url(path)
         feed = await self._fetch_feed(url)
         return self._parse_articles(feed, max_results)
@@ -1469,12 +1534,13 @@ class AsyncGoogleNewsClient(BaseGoogleNewsClient):
         self,
         topic: str = "WORLD",
         *,
+        topic_token: Optional[str] = None,
         max_results: Optional[int] = None,
     ) -> List[ArticleCluster]:
         """Get top news article clusters (with related coverage) for a topic
-        asynchronously.
+        or custom section token asynchronously.
         """
-        path = self._get_topic_path(topic)
+        path = self._get_topic_path(topic, topic_token=topic_token)
         url = self._build_url(path)
         feed = await self._fetch_feed(url)
         return self._parse_article_clusters(feed, max_results)

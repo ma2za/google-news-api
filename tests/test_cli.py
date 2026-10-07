@@ -671,3 +671,76 @@ def test_cli_clusters_invalid_format(monkeypatch):
         "The 'clusters' command only supports 'table' and 'json' formats"
         in error.getvalue()
     )
+
+
+def test_cli_top_forwards_topic_token(monkeypatch):
+    """The top command forwards topic_token to client.top_news."""
+    install_fake_client(monkeypatch)
+    output = io.StringIO()
+
+    exit_code = cli.main(
+        [
+            "top",
+            "--topic-token",
+            "CAAqKggKIiRDQkFTRF...",
+            "--format",
+            "json",
+        ],
+        output=output,
+    )
+
+    assert exit_code == 0
+    client = FakeClient.instances[0]
+    assert client.top_news_kwargs == {
+        "topic": "WORLD",
+        "topic_token": "CAAqKggKIiRDQkFTRF...",
+        "max_results": None,
+        "mode": "default",
+    }
+
+
+def test_cli_clusters_forwards_topic_token(monkeypatch):
+    """The clusters command forwards topic_token to client.top_news_clusters."""
+    install_fake_client(monkeypatch)
+    output = io.StringIO()
+
+    exit_code = cli.main(
+        [
+            "clusters",
+            "--topic-token",
+            "CAAqKggKIiRDQkFTRF...",
+            "--format",
+            "json",
+        ],
+        output=output,
+    )
+
+    assert exit_code == 0
+    client = FakeClient.instances[0]
+    assert client.top_news_clusters_kwargs == {
+        "topic": "WORLD",
+        "topic_token": "CAAqKggKIiRDQkFTRF...",
+        "max_results": None,
+    }
+
+
+def test_cli_top_rejects_named_topic_with_topic_token():
+    """The top command exits with error when named topic is used with topic_token."""
+    error = io.StringIO()
+
+    exit_code = cli.main(
+        [
+            "top",
+            "--topic",
+            "TECHNOLOGY",
+            "--topic-token",
+            "CAAqKggKIiRDQkFTRF...",
+        ],
+        error=error,
+    )
+
+    assert exit_code == 1
+    assert (
+        "google-news: Cannot use 'topic_token' together with a custom 'topic'"
+        in error.getvalue()
+    )
