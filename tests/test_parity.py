@@ -167,6 +167,51 @@ async def test_top_news_invalid_topic_parity():
     assert async_exc.value.field == "topic"
 
 
+@pytest.mark.parametrize(
+    "kwargs,expected_field,expected_msg",
+    [
+        ({"topic_token": ""}, "topic_token", "topic_token must be a non-empty string"),
+        (
+            {"topic_token": "   "},
+            "topic_token",
+            "topic_token must be a non-empty string",
+        ),
+        ({"topic_token": 123}, "topic_token", "topic_token must be a non-empty string"),
+        (
+            {"topic_token": "https://news.google.com/topics/abc"},
+            "topic_token",
+            "topic_token must be a section token, not a URL",
+        ),
+        (
+            {"topic": "TECHNOLOGY", "topic_token": "CAAq..."},
+            "topic_token",
+            "Cannot use 'topic_token' together with a custom 'topic'",
+        ),
+        (
+            {"mode": "searchapi_light", "topic_token": "CAAq..."},
+            "topic_token",
+            "topic_token is only supported in default RSS mode",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_top_news_topic_token_validation_parity(
+    kwargs, expected_field, expected_msg
+):
+    client = GoogleNewsClient()
+    with pytest.raises(ValidationError) as sync_exc:
+        client.top_news(**kwargs)
+
+    async with AsyncGoogleNewsClient() as async_client:
+        with pytest.raises(ValidationError) as async_exc:
+            await async_client.top_news(**kwargs)
+
+    assert sync_exc.value.field == expected_field
+    assert async_exc.value.field == expected_field
+    assert expected_msg in str(sync_exc.value)
+    assert expected_msg in str(async_exc.value)
+
+
 @pytest.mark.asyncio
 async def test_search_invalid_mode_parity():
     client = GoogleNewsClient()

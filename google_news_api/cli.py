@@ -82,12 +82,22 @@ def _parser() -> argparse.ArgumentParser:
 
     top = subparsers.add_parser("top", help="Fetch top news by topic")
     top.add_argument("--topic", default="WORLD")
+    top.add_argument(
+        "--topic-token",
+        dest="topic_token",
+        help="Google News custom section token",
+    )
     _add_common_options(top)
 
     clusters = subparsers.add_parser(
         "clusters", help="Fetch top news articles as clusters with related coverage"
     )
     clusters.add_argument("--topic", default="WORLD")
+    clusters.add_argument(
+        "--topic-token",
+        dest="topic_token",
+        help="Google News custom section token",
+    )
     _add_common_options(clusters)
 
     location = subparsers.add_parser(
@@ -417,10 +427,13 @@ def _run(args: argparse.Namespace, output: TextIO) -> None:
                     field="output_format",
                     value=args.output_format,
                 )
-            clusters = client.top_news_clusters(
-                topic=args.topic,
-                max_results=args.max_results,
-            )
+            kwargs = {
+                "topic": args.topic,
+                "max_results": args.max_results,
+            }
+            if getattr(args, "topic_token", None) is not None:
+                kwargs["topic_token"] = args.topic_token
+            clusters = client.top_news_clusters(**kwargs)
             if args.output_format == "json":
                 _write_clusters_json(clusters, output)
             else:
@@ -432,11 +445,14 @@ def _run(args: argparse.Namespace, output: TextIO) -> None:
                 max_results=args.max_results,
             )
         else:
-            articles = client.top_news(
-                topic=args.topic,
-                max_results=args.max_results,
-                mode=args.mode,
-            )
+            kwargs = {
+                "topic": args.topic,
+                "max_results": args.max_results,
+                "mode": args.mode,
+            }
+            if getattr(args, "topic_token", None) is not None:
+                kwargs["topic_token"] = args.topic_token
+            articles = client.top_news(**kwargs)
 
         articles = _enrich_articles(args, client, articles)
 

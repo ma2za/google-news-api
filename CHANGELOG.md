@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.1.1 - 2026-10-07
+
+### Added
+
+- Support for Google News custom section tokens via the `topic_token` keyword-only argument in `GoogleNewsClient.top_news`, `GoogleNewsClient.top_news_clusters`, `AsyncGoogleNewsClient.top_news`, and `AsyncGoogleNewsClient.top_news_clusters`.
+- Added `--topic-token` option to CLI `google-news top` and `google-news clusters` subcommands.
+- Added `topic_token` optional parameter to MCP server `top_news` and `top_news_clusters` tools.
+- Real frozen RSS fixture tests and live probe characterization across multiple locales (`en-US`, `it-IT`, `ro-RO`, `de-DE`), routing tokens directly through `https://news.google.com/rss/topics/<TOKEN>`.
+- Comprehensive validation rejecting empty tokens, non-string tokens, URLs, and mutual exclusion when specifying a custom named topic alongside a token.
+
+### Compatibility
+
+- Strictly zero breaking changes: 100% backward compatible with `0.1.0`. All named topic routes, signatures, defaults, and cache keys are preserved.
+
 ## 0.1.0 - 2026-10-04
 
 ### Added

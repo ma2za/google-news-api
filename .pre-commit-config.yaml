@@ -25,4 +25,5 @@ repos:
     rev: 7.3.0
     hooks:
       - id: flake8
+        entry: python -m flake8
         args: ["--max-line-length=88"]  # Match black's line length

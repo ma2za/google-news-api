@@ -459,3 +459,76 @@ def test_mcp_server_cli_forwards_http_settings(monkeypatch):
         "port": 8123,
         "run": {"transport": "streamable-http"},
     }
+
+
+@pytest.mark.asyncio
+async def test_mcp_top_news_forwards_topic_token(monkeypatch):
+    client = FakeClient()
+
+    async def get_client(language="en", country="US"):
+        return client
+
+    monkeypatch.setattr(mcp_server, "get_client", get_client)
+
+    result = await mcp_server.top_news(
+        topic_token="CAAqKggKIiRDQkFTRF...",
+        max_results=3,
+        decode_links=False,
+        extract_text=False,
+    )
+
+    assert result[0]["title"] == "Top"
+    assert client.top_news_kwargs == {
+        "topic": "WORLD",
+        "topic_token": "CAAqKggKIiRDQkFTRF...",
+        "max_results": 3,
+        "mode": "default",
+    }
+
+
+@pytest.mark.asyncio
+async def test_mcp_top_news_clusters_forwards_topic_token(monkeypatch):
+    client = FakeClient()
+
+    async def get_client(language="en", country="US"):
+        return client
+
+    monkeypatch.setattr(mcp_server, "get_client", get_client)
+
+    result = await mcp_server.top_news_clusters(
+        topic_token="CAAqKggKIiRDQkFTRF...",
+        max_results=3,
+        decode_links=False,
+    )
+
+    assert len(result) == 1
+    assert client.top_news_clusters_kwargs == {
+        "topic": "WORLD",
+        "topic_token": "CAAqKggKIiRDQkFTRF...",
+        "max_results": 3,
+    }
+
+
+@pytest.mark.asyncio
+async def test_mcp_top_news_reports_validation_error(monkeypatch):
+    from google_news_api import AsyncGoogleNewsClient
+
+    client = AsyncGoogleNewsClient()
+
+    async def get_client(language="en", country="US"):
+        return client
+
+    monkeypatch.setattr(mcp_server, "get_client", get_client)
+
+    result = await mcp_server.top_news(
+        topic="BUSINESS",
+        topic_token="CAAqKggKIiRDQkFTRF...",
+        decode_links=False,
+        extract_text=False,
+    )
+
+    assert len(result) == 1
+    assert "error" in result[0]
+    assert (
+        "Cannot use 'topic_token' together with a custom 'topic'" in result[0]["error"]
+    )
