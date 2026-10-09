@@ -46,8 +46,8 @@ request.
 11. Monitor the publishing workflow. After publication, install
     `google-news-api==X.Y.Z` from PyPI in a clean environment and repeat version,
     entry-point, artifact, and `pip check` smoke tests.
-12. Record release metrics and outcomes only in the private local maintainer
-    plan.
+12. Record release metrics and outcomes in the tracked `RELEASE_PLAN.md`.
+    Never record credentials or captured private request headers.
 
 If an artifact is defective, yank it rather than attempting to replace the same
 version.

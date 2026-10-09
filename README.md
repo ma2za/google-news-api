@@ -3,13 +3,13 @@
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/google-news-api?period=monthly&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads%2Fmonth)](https://pepy.tech/projects/google-news-api)
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
 [![PyPI Version](https://img.shields.io/pypi/v/google-news-api)](https://pypi.org/project/google-news-api/)
-[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://ma2za.github.io/google-news-api/)
+[![Documentation](https://img.shields.io/badge/docs-source-blue)](docs/index.md)
 
 Unofficial Python client for Google News RSS. Search trusted publishers, run
 batch research, fetch top stories, decode article URLs, and use the same tools
 from async code, the command line, or an MCP server.
 
-Full documentation and guides: [https://ma2za.github.io/google-news-api/](https://ma2za.github.io/google-news-api/)
+Full documentation and guides: [docs/index.md](docs/index.md).
 
 This package is not an official Google API. It uses Google News RSS feeds by
 default and offers optional SearchAPI-backed modes when you need provider URLs
@@ -441,6 +441,15 @@ The client raises specific exceptions for invalid configuration, invalid query
 parameters, HTTP failures, rate limits, and feed parsing failures.
 
 ## Development
+
+For a fresh Linux cloud task, use [CODEX_CLOUD.md](CODEX_CLOUD.md). Its setup
+installs isolated tools and locked dependencies without workstation files or
+credentials:
+
+```bash
+bash scripts/codex-cloud-setup.sh
+export PATH="$PWD/.tools/poetry/bin:$PATH"
+```
 
 ```bash
 git clone https://github.com/ma2za/google-news-api.git

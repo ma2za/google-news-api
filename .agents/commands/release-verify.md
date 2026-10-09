@@ -1,10 +1,10 @@
 # Verify a release candidate
 
-Read `AGENTS.md`, the entire `.agents/PRIVATE_RELEASE_PLAN.md`,
+Read `AGENTS.md`, the entire `RELEASE_PLAN.md`,
 `.agents/FAILURE_RETROSPECTIVE.md`, and `docs/releasing.md`. Inspect the
 worktree and version-bearing files first.
 
-Confirm `pyproject.toml`, `CHANGELOG.md`, README examples, the selected private
+Confirm `pyproject.toml`, `CHANGELOG.md`, README examples, the selected
 plan release, the latest published PyPI version, and Git tags agree. Confirm the
 target version has not already been used.
 

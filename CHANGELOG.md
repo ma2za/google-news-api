@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Development
+
+- Added an isolated Linux cloud setup using the existing Poetry lock and tool
+  versions from CI, including offline checks and package-validation tools.
+- Tracked the complete maintainer release plan as `RELEASE_PLAN.md`, as approved
+  by the maintainer, and updated all active agent references to its shared path.
+- Documented optional credential configuration without workstation files.
+- Pointed README documentation links at the checked-in guides. The published
+  package version and public interfaces are unchanged.
+
 ## 0.1.1 - 2026-10-07
 
 ### Added

@@ -9,3 +9,7 @@ from Git. Every agent must read `AGENTS.md` and directly open the full private
 plan for any next-release, roadmap, or release-readiness question. Absence from
 Git or search output is not evidence that local maintainer context does not
 exist.
+
+On 2026-10-09, the maintainer approved tracking the complete plan as
+`RELEASE_PLAN.md`. Current agents read that canonical path; the earlier private
+path describes the historical failure above.

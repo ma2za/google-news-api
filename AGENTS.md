@@ -12,19 +12,19 @@ them.
 - Read `.agents/README.md` when it exists.
 - For any question about the next release, release readiness, roadmap, planned
   work, or what to implement next, read all of
-  `.agents/PRIVATE_RELEASE_PLAN.md` before answering or editing.
+  `RELEASE_PLAN.md` before answering or editing.
 - For release work, also read `.agents/FAILURE_RETROSPECTIVE.md`,
   `docs/releasing.md`, `CHANGELOG.md`, and `pyproject.toml`.
 - Verify plan statuses against the latest Git tag and published PyPI version.
-  If the private plan is stale, update its local status before selecting the
+  If the plan is stale, update its status before selecting the
   first release that is not `Released`.
-- Never infer that no plan exists from `rg --files`, `git status`, or tracked
-  files alone. Private maintainer context is intentionally excluded from Git.
+- Never infer that no plan exists from incomplete search results. Open the
+  canonical tracked `RELEASE_PLAN.md` directly.
 
-The private plan, private metrics, future promises, secrets, and credentials
-must never be committed or published. Generic operational instructions and
-sanitized failure retrospectives belong in `AGENTS.md` or tracked `.agents/`
-files so every agent receives them.
+The maintainer approved tracking the full release plan on 2026-10-09. Keep its
+goals distinct from already-shipped behavior. Secrets and credentials must never
+be committed or published. Operational instructions and failure retrospectives
+belong in `AGENTS.md` or tracked `.agents/` files so every agent receives them.
 
 ## Project
 
@@ -39,6 +39,14 @@ keys, environment variables, console scripts, and MCP tool signatures as
 required by `docs/compatibility.md`.
 
 ## Development
+
+For a fresh Linux cloud task, read `CODEX_CLOUD.md` and run
+`bash scripts/codex-cloud-setup.sh`. Add `.tools/poetry/bin` to the current
+shell's `PATH` before using the normal Poetry commands below. No workstation
+environment file is required for RSS development or offline tests.
+
+Every checkout includes `RELEASE_PLAN.md`. Read it before release or roadmap
+work; do not rely on workstation files or an external context archive.
 
 - Use the existing style and the simplest working implementation.
 - Add a regression test for every bug fix and offline tests for new behavior.
@@ -67,7 +75,7 @@ has explicitly requested or authorized release execution.
 
 ## Releases
 
-Follow `.agents/PRIVATE_RELEASE_PLAN.md` and `docs/releasing.md`. Portable
+Follow `RELEASE_PLAN.md` and `docs/releasing.md`. Portable
 release preparation and verification prompts live in `.agents/commands/`.
 
 - Keep the published version unchanged during implementation.

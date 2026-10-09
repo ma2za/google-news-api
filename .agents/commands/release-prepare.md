@@ -6,12 +6,12 @@ version or Git tag.
 Prepare `google-news-api` end to end, stopping before commit, tag, push, GitHub
 release creation, PyPI publication, or announcement.
 
-Read `AGENTS.md`, the entire `.agents/PRIVATE_RELEASE_PLAN.md`,
+Read `AGENTS.md`, the entire `RELEASE_PLAN.md`,
 `.agents/FAILURE_RETROSPECTIVE.md`, `docs/releasing.md`, `CHANGELOG.md`,
 `pyproject.toml`, relevant Git history, and the current worktree first. Preserve
 unrelated worktree changes.
 
-Implement only the selected release from the private plan. Keep the published
+Implement only the selected release from the release plan. Keep the published
 version unchanged until implementation is complete. Then synchronize
 `pyproject.toml`, prepend the `CHANGELOG.md` entry, and update README examples
 only for verified shipped behavior. Do not invent features or claims.

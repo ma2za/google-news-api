@@ -2,6 +2,10 @@
 
 ## Setup
 
+For Linux cloud development, start with [CODEX_CLOUD.md](CODEX_CLOUD.md) and
+`bash scripts/codex-cloud-setup.sh`. Read the tracked `RELEASE_PLAN.md` before
+selecting release or roadmap work.
+
 Clone the repository and install the package, development tools, and optional
 MCP dependencies:
 
